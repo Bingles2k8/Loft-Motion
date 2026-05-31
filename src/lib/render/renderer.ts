@@ -68,14 +68,27 @@ import type {
   SceneDocument,
   ShapePayload,
 } from "@/lib/scene/schema";
+import { evalBehaviors, type CloneContext } from "@/lib/anim/behaviors";
+import {
+  clonerTransforms,
+  cloneCount,
+  type CloneTransform,
+} from "@/lib/anim/cloner";
+
+/** One rendered copy of a layer (1 per layer normally; N when cloned). */
+interface CloneNode {
+  container: Container; // holds the visual; carries this copy's transform
+  display: Container;
+  filters: Map<string, Filter>; // keyed by effect id
+  clone: CloneTransform; // per-clone offset (identity when not cloning)
+}
 
 interface LayerNode {
   layer: Layer;
-  container: Container;
-  display: Container; // the visual child (graphics/text/sprite) inside container
+  outer: Container; // parented holder (no transform of its own)
+  clones: CloneNode[];
   width: number;
   height: number;
-  filters: Map<string, Filter>; // keyed by effect id
 }
 
 function hex(color: string): number {
@@ -104,6 +117,11 @@ function signature(scene: SceneDocument): string {
       tx: l.text,
       im: l.image && `${l.image.src.length}:${l.image.src.slice(0, 64)}`,
       fx: l.effects.map((e) => ({ id: e.id, t: e.type, on: e.enabled, c: e.color, c2: e.color2 })),
+      // Cloner geometry (clone COUNT) changes the graph → rebuild; per-clone
+      // step/stagger params are applied live in renderAt.
+      cl: l.cloner?.enabled
+        ? `${l.cloner.mode}:${l.cloner.cols}x${l.cloner.rows}:${l.cloner.count}`
+        : "0",
     })),
   });
 }
@@ -167,7 +185,7 @@ export class SceneRenderer {
     const stage = this.app.stage;
     // Tear down old nodes.
     for (const node of this.nodes.values()) {
-      node.container.destroy({ children: true });
+      node.outer.destroy({ children: true });
     }
     this.nodes.clear();
     stage.removeChildren();
@@ -193,23 +211,21 @@ export class SceneRenderer {
     for (const layer of scene.layers) {
       const node = this.nodes.get(layer.id)!;
       const parent = layer.parentId ? this.nodes.get(layer.parentId) : null;
-      if (parent) parent.container.addChild(node.container);
-      else stage.addChild(node.container);
+      if (parent) parent.outer.addChild(node.outer);
+      else stage.addChild(node.outer);
     }
 
     this.sig = signature(scene);
   }
 
-  private buildNode(layer: Layer): LayerNode {
-    const container = new Container();
-    container.label = layer.name;
+  /** Build the visual display object for a layer (one per clone). */
+  private buildDisplay(layer: Layer): { display: Container; width: number; height: number } {
     let display: Container;
     let width = 0;
     let height = 0;
 
     if (layer.type === "shape" && layer.shape) {
-      const g = this.drawShape(layer.shape);
-      display = g;
+      display = this.drawShape(layer.shape);
       width = layer.shape.width;
       height = layer.shape.height;
     } else if (layer.type === "text" && layer.text) {
@@ -232,8 +248,6 @@ export class SceneRenderer {
       width = w0;
       height = h0;
       display = sprite;
-      // Load the real texture asynchronously, then resize + redraw the frame
-      // (otherwise the canvas keeps showing the initial empty texture).
       void this.loadImage(layer.image.src).then((tex) => {
         if (!tex) return;
         sprite.texture = tex;
@@ -241,25 +255,50 @@ export class SceneRenderer {
         this.renderAt(this.lastTime);
       });
     } else {
-      // group / precomp — an empty container.
       display = new Container();
     }
+    return { display, width, height };
+  }
 
-    container.addChild(display);
-
+  private buildFilters(layer: Layer): { filters: Map<string, Filter>; list: Filter[] } {
     const filters = new Map<string, Filter>();
-    const filterList: Filter[] = [];
+    const list: Filter[] = [];
     for (const effect of layer.effects) {
       if (!effect.enabled) continue;
       const f = this.createFilter(effect);
       if (f) {
         filters.set(effect.id, f);
-        filterList.push(f);
+        list.push(f);
       }
     }
-    if (filterList.length) container.filters = filterList;
+    return { filters, list };
+  }
 
-    return { layer, container, display, width, height, filters };
+  private buildNode(layer: Layer): LayerNode {
+    const outer = new Container();
+    outer.label = layer.name;
+
+    // Per-clone transforms (identity single clone when the cloner is off).
+    const cloneTfs: CloneTransform[] =
+      layer.cloner?.enabled
+        ? clonerTransforms(layer.cloner)
+        : [{ index: 0, dx: 0, dy: 0, rotation: 0, scaleMul: 1, opacityMul: 1 }];
+
+    let width = 0;
+    let height = 0;
+    const clones: CloneNode[] = cloneTfs.map((clone) => {
+      const container = new Container();
+      const { display, width: w, height: h } = this.buildDisplay(layer);
+      width = w;
+      height = h;
+      container.addChild(display);
+      const { filters, list } = this.buildFilters(layer);
+      if (list.length) container.filters = list;
+      outer.addChild(container);
+      return { container, display, filters, clone };
+    });
+
+    return { layer, outer, clones, width, height };
   }
 
   private drawShape(shape: ShapePayload): Graphics {
@@ -498,27 +537,45 @@ export class SceneRenderer {
     this.lastTime = t;
     const layersById = new Map(this.scene.layers.map((l) => [l.id, l]));
 
+    const dur = this.scene.composition.duration;
+
     for (const layer of this.scene.layers) {
       const node = this.nodes.get(layer.id);
       if (!node) continue;
       node.layer = layer;
+
       const tf = evalTransform(layer.transform, t);
-      const c = node.container;
+      const active = layer.visible && isLayerActive(layer, t);
+      const count = layer.cloner?.enabled ? cloneCount(layer.cloner) : 1;
+      const stagger = layer.cloner?.enabled ? layer.cloner.stagger : 0;
 
-      c.position.set(tf.x, tf.y);
-      c.pivot.set(tf.anchorX * node.width, tf.anchorY * node.height);
-      c.scale.set(tf.scaleX / 100, tf.scaleY / 100);
-      c.rotation = (tf.rotation * Math.PI) / 180;
-      c.alpha = tf.opacity / 100;
-      c.visible = layer.visible && isLayerActive(layer, t);
-      c.blendMode = layer.blendMode;
+      for (const cn of node.clones) {
+        const cl = cn.clone;
+        // Per-clone behavior cascade (index drives the stagger delay).
+        const ctx: CloneContext = { index: cl.index, count, stagger };
+        const beh = evalBehaviors(layer.behaviors ?? [], t, dur, ctx);
 
-      // Update animatable filter params live.
-      for (const effect of layer.effects) {
-        const f = node.filters.get(effect.id);
-        if (!f) continue;
-        const p = evalEffectParams(effect, t);
-        applyFilterParams(f, effect, p, t);
+        const c = cn.container;
+        c.position.set(tf.x + cl.dx + beh.x, tf.y + cl.dy + beh.y);
+        c.pivot.set(tf.anchorX * node.width, tf.anchorY * node.height);
+        const sc = (tf.scaleX / 100) * cl.scaleMul + beh.scale / 100;
+        const scY = (tf.scaleY / 100) * cl.scaleMul + beh.scale / 100;
+        c.scale.set(sc, scY);
+        c.rotation = ((tf.rotation + cl.rotation + beh.rotation) * Math.PI) / 180;
+        c.alpha = Math.max(
+          0,
+          Math.min(1, (tf.opacity / 100) * cl.opacityMul + beh.opacity / 100),
+        );
+        c.visible = active;
+        c.blendMode = layer.blendMode;
+
+        // Update animatable filter params live.
+        for (const effect of layer.effects) {
+          const f = cn.filters.get(effect.id);
+          if (!f) continue;
+          const p = evalEffectParams(effect, t);
+          applyFilterParams(f, effect, p, t);
+        }
       }
       void layersById; // (parent-opacity folding handled by Pixi nesting)
     }

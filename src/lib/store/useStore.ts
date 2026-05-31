@@ -13,6 +13,8 @@
 import { create } from "zustand";
 import {
   type Asset,
+  type Behavior,
+  type Cloner,
   type ExportTarget,
   type Keyframe,
   type Layer,
@@ -61,7 +63,7 @@ function loadSizes(): PanelSizes {
   return DEFAULT_SIZES;
 }
 
-export type LeftTab = "project" | "effects";
+export type LeftTab = "project" | "effects" | "behaviors";
 
 export interface StoreState {
   scene: SceneDocument;
@@ -99,6 +101,7 @@ export interface StoreState {
   showPrinciples: boolean;
   showExport: boolean;
   showSettings: boolean;
+  showExamples: boolean;
 
   // Scene mutations
   update: (recipe: Recipe) => void;
@@ -118,6 +121,18 @@ export interface StoreState {
   addAsset: (asset: Asset) => void;
   removeAsset: (id: string) => void;
   renameAsset: (id: string, name: string) => void;
+
+  // Behaviors & cloner
+  addBehavior: (layerId: string, behavior: Behavior) => void;
+  removeBehavior: (layerId: string, behaviorId: string) => void;
+  updateBehavior: (
+    layerId: string,
+    behaviorId: string,
+    patch: (b: Behavior) => void,
+    live?: boolean,
+  ) => void;
+  setCloner: (layerId: string, cloner: Cloner | undefined) => void;
+  updateCloner: (layerId: string, patch: (c: Cloner) => void, live?: boolean) => void;
 
   // Keyframes
   addKeyframe: (layerId: string, channelPath: string, kf: Keyframe) => void;
@@ -157,6 +172,7 @@ export interface StoreState {
   setShowPrinciples: (v: boolean) => void;
   setShowExport: (v: boolean) => void;
   setShowSettings: (v: boolean) => void;
+  setShowExamples: (v: boolean) => void;
 
   // Channel solo + auto-keyframe
   toggleSoloChannel: (layerId: string, channelPath: string) => void;
@@ -227,6 +243,7 @@ export const useStore = create<StoreState>((set, get) => ({
   showPrinciples: false,
   showExport: false,
   showSettings: false,
+  showExamples: false,
 
   update: (recipe) =>
     set((state) => {
@@ -319,6 +336,44 @@ export const useStore = create<StoreState>((set, get) => ({
       const a = s.assets.find((x) => x.id === id);
       if (a) a.name = name;
     }),
+
+  addBehavior: (layerId, behavior) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === layerId);
+      if (l) (l.behaviors ??= []).push(behavior);
+    }),
+
+  removeBehavior: (layerId, behaviorId) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === layerId);
+      if (l?.behaviors) l.behaviors = l.behaviors.filter((b) => b.id !== behaviorId);
+    }),
+
+  updateBehavior: (layerId, behaviorId, patch, live = false) => {
+    const apply = (s: SceneDocument) => {
+      const b = s.layers
+        .find((x) => x.id === layerId)
+        ?.behaviors?.find((y) => y.id === behaviorId);
+      if (b) patch(b);
+    };
+    if (live) get().updateLive(apply);
+    else get().update(apply);
+  },
+
+  setCloner: (layerId, cloner) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === layerId);
+      if (l) l.cloner = cloner;
+    }),
+
+  updateCloner: (layerId, patch, live = false) => {
+    const apply = (s: SceneDocument) => {
+      const l = s.layers.find((x) => x.id === layerId);
+      if (l?.cloner) patch(l.cloner);
+    };
+    if (live) get().updateLive(apply);
+    else get().update(apply);
+  },
 
   addKeyframe: (layerId, channelPath, kf) =>
     get().update((s) => {
@@ -479,6 +534,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setShowPrinciples: (v) => set({ showPrinciples: v }),
   setShowExport: (v) => set({ showExport: v }),
   setShowSettings: (v) => set({ showSettings: v }),
+  setShowExamples: (v) => set({ showExamples: v }),
 
   toggleSoloChannel: (layerId, channelPath) =>
     set((s) => {

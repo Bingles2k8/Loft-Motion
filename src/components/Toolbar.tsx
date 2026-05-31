@@ -3,7 +3,6 @@
 import { useRef } from "react";
 import { useStore } from "@/lib/store/useStore";
 import {
-  createImageLayer,
   createShapeLayer,
   createTextLayer,
 } from "@/lib/scene/factory";
@@ -19,6 +18,7 @@ import {
   IconCircle,
   IconDownload,
   IconLayers,
+  IconGrid,
   IconMenu,
   IconRedo,
   IconSpark,
@@ -63,6 +63,7 @@ export function Toolbar() {
   const update = useStore((s) => s.update);
   const setShowExport = useStore((s) => s.setShowExport);
   const setShowSettings = useStore((s) => s.setShowSettings);
+  const setShowExamples = useStore((s) => s.setShowExamples);
   const setShowPrinciples = useStore((s) => s.setShowPrinciples);
   const showPrinciples = useStore((s) => s.showPrinciples);
   const setLeftTab = useStore((s) => s.setLeftTab);
@@ -175,6 +176,16 @@ export function Toolbar() {
       >
         <IconSpark width={15} height={15} />
         Craft
+      </button>
+
+      {/* Example projects */}
+      <button
+        onClick={() => setShowExamples(true)}
+        title="Example projects"
+        className="flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium text-haze-300 transition hover:bg-ink-700 hover:text-haze-200"
+      >
+        <IconGrid width={15} height={15} />
+        Examples
       </button>
 
       {/* Import (scene JSON or media) / save scene */}

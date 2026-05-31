@@ -12,8 +12,11 @@ import {
   getChannel,
   type ChannelDef,
 } from "@/lib/scene/paths";
-import { createEffect, kf as makeKf } from "@/lib/scene/factory";
+import { createBehavior, createCloner, createEffect, kf as makeKf } from "@/lib/scene/factory";
 import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
+import { BEHAVIOR_LIST, behaviorDef } from "@/lib/anim/behaviorCatalog";
+import { applyPreset, BEHAVIOR_PRESETS } from "@/lib/anim/behaviors";
+import { CLONER_MODES, type BehaviorType } from "@/lib/scene/schema";
 import {
   BLEND_MODES,
   EXPORT_TARGETS,
@@ -508,6 +511,8 @@ function LayerProperties({ layer }: { layer: Layer }) {
         </Section>
       )}
 
+      <BehaviorsSection layer={layer} />
+      <ClonerSection layer={layer} />
       <EffectsSection layer={layer} />
       <CapabilitySection layer={layer} scene={scene} />
     </>
@@ -515,6 +520,282 @@ function LayerProperties({ layer }: { layer: Layer }) {
 }
 
 /* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*  Behaviors (procedural)                                                     */
+/* -------------------------------------------------------------------------- */
+
+function BehaviorsSection({ layer }: { layer: Layer }) {
+  const addBehavior = useStore((s) => s.addBehavior);
+  const behaviors = layer.behaviors ?? [];
+
+  return (
+    <Section
+      title="Behaviors"
+      collapsible
+      right={
+        <Select
+          value=""
+          onChange={(v) => v && addBehavior(layer.id, createBehavior(v as BehaviorType))}
+          options={[
+            { value: "", label: "+ Add" },
+            ...BEHAVIOR_LIST.map((b) => ({ value: b.type, label: b.label })),
+          ]}
+        />
+      }
+    >
+      {behaviors.length === 0 && (
+        <p className="text-[11px] text-haze-500">
+          Procedural motion with no keyframes. Add Wiggle, Oscillate, Spin,
+          Spring or Orbit — they animate instantly and loop forever.
+        </p>
+      )}
+      {behaviors.map((b) => (
+        <BehaviorCard key={b.id} layerId={layer.id} behaviorId={b.id} layer={layer} />
+      ))}
+    </Section>
+  );
+}
+
+function BehaviorCard({
+  layerId,
+  behaviorId,
+  layer,
+}: {
+  layerId: string;
+  behaviorId: string;
+  layer: Layer;
+}) {
+  const updateBehavior = useStore((s) => s.updateBehavior);
+  const removeBehavior = useStore((s) => s.removeBehavior);
+  const beginChange = useStore((s) => s.beginChange);
+  const [open, setOpen] = useState(true);
+  const b = layer.behaviors?.find((x) => x.id === behaviorId);
+  if (!b) return null;
+  const def = behaviorDef(b.type);
+
+  return (
+    <div className="rounded border border-ink-700">
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className={`grid h-4 w-4 place-items-center text-haze-500 transition hover:text-haze-200 ${open ? "rotate-90" : ""}`}
+        >
+          <IconChevron width={11} height={11} />
+        </button>
+        <span className="flex-1 text-xs font-semibold text-haze-200">{def.label}</span>
+        <label className="flex items-center gap-1 text-[10px] text-haze-400">
+          <input
+            type="checkbox"
+            checked={b.enabled}
+            onChange={(e) => updateBehavior(layerId, behaviorId, (x) => (x.enabled = e.target.checked))}
+          />
+          on
+        </label>
+        <button
+          onClick={() => removeBehavior(layerId, behaviorId)}
+          className="text-haze-400 transition hover:text-rose-300"
+        >
+          <IconTrash width={13} height={13} />
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-1.5 border-t border-ink-800 p-2">
+          {/* Presets */}
+          <div className="flex gap-1">
+            {BEHAVIOR_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                onClick={() =>
+                  updateBehavior(layerId, behaviorId, (x) => {
+                    x.params = applyPreset(x.type, preset);
+                  })
+                }
+                className="flex-1 rounded bg-ink-700 py-0.5 text-[10px] capitalize text-haze-300 transition hover:bg-ink-600 hover:text-haze-100"
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+          {/* Target + strength */}
+          <Row>
+            <Label>Apply to</Label>
+            <Select
+              value={b.target}
+              onChange={(v) =>
+                updateBehavior(layerId, behaviorId, (x) => (x.target = v as typeof x.target))
+              }
+              options={def.targets.map((t) => ({ value: t, label: cap(t) }))}
+            />
+          </Row>
+          <Row>
+            <Label>Strength</Label>
+            <NumberInput
+              value={b.strength * 100}
+              min={0}
+              max={400}
+              suffix="%"
+              onCommitStart={beginChange}
+              onChange={(v, live) =>
+                updateBehavior(layerId, behaviorId, (x) => (x.strength = v / 100), live)
+              }
+            />
+          </Row>
+          {/* Params */}
+          {def.params.map((pd) => (
+            <Row key={pd.key}>
+              <Label>{pd.label}</Label>
+              <NumberInput
+                value={b.params[pd.key] ?? 0}
+                min={pd.min}
+                max={pd.max}
+                step={pd.step}
+                suffix={pd.unit}
+                onCommitStart={beginChange}
+                onChange={(v, live) =>
+                  updateBehavior(layerId, behaviorId, (x) => (x.params[pd.key] = v), live)
+                }
+              />
+            </Row>
+          ))}
+          <label className="flex items-center gap-2 text-[11px] text-haze-300">
+            <input
+              type="checkbox"
+              checked={b.loop}
+              onChange={(e) => updateBehavior(layerId, behaviorId, (x) => (x.loop = e.target.checked))}
+            />
+            Loop seamlessly
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Cloner                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function ClonerSection({ layer }: { layer: Layer }) {
+  const setCloner = useStore((s) => s.setCloner);
+  const updateCloner = useStore((s) => s.updateCloner);
+  const beginChange = useStore((s) => s.beginChange);
+  const c = layer.cloner;
+  const on = !!c?.enabled;
+
+  return (
+    <Section
+      title="Cloner"
+      collapsible
+      right={
+        <label className="flex items-center gap-1.5 text-[10px] text-haze-400">
+          <input
+            type="checkbox"
+            checked={on}
+            onChange={(e) =>
+              setCloner(layer.id, e.target.checked ? createCloner() : undefined)
+            }
+          />
+          on
+        </label>
+      }
+    >
+      {!on || !c ? (
+        <p className="text-[11px] text-haze-500">
+          Multiply this layer into a grid, circle or line. Combine with a
+          behavior + stagger for cascading reveals.
+        </p>
+      ) : (
+        <>
+          <Row>
+            <Label>Mode</Label>
+            <Select
+              value={c.mode}
+              onChange={(v) => updateCloner(layer.id, (x) => (x.mode = v as typeof x.mode))}
+              options={CLONER_MODES.map((m) => ({ value: m, label: cap(m) }))}
+            />
+          </Row>
+          {c.mode === "grid" && (
+            <>
+              <Row>
+                <Label>Columns</Label>
+                <NumberInput value={c.cols} min={1} max={40} step={1} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.cols = Math.round(v)), live)} />
+                <NumberInput value={c.rows} min={1} max={40} step={1} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.rows = Math.round(v)), live)} />
+              </Row>
+              <Row>
+                <Label>Spacing</Label>
+                <NumberInput value={c.spacingX} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.spacingX = v), live)} />
+                <NumberInput value={c.spacingY} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.spacingY = v), live)} />
+              </Row>
+            </>
+          )}
+          {c.mode === "radial" && (
+            <>
+              <Row>
+                <Label>Count</Label>
+                <NumberInput value={c.count} min={1} max={120} step={1} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.count = Math.round(v)), live)} />
+              </Row>
+              <Row>
+                <Label>Radius</Label>
+                <NumberInput value={c.radius} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.radius = v), live)} />
+              </Row>
+              <Row>
+                <Label>Start</Label>
+                <NumberInput value={c.startAngle} suffix="°" onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.startAngle = v), live)} />
+              </Row>
+              <label className="flex items-center gap-2 text-[11px] text-haze-300">
+                <input type="checkbox" checked={c.faceOut}
+                  onChange={(e) => updateCloner(layer.id, (x) => (x.faceOut = e.target.checked))} />
+                Face outward
+              </label>
+            </>
+          )}
+          {c.mode === "line" && (
+            <>
+              <Row>
+                <Label>Count</Label>
+                <NumberInput value={c.count} min={1} max={120} step={1} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.count = Math.round(v)), live)} />
+              </Row>
+              <Row>
+                <Label>Spacing</Label>
+                <NumberInput value={c.spacingX} onCommitStart={beginChange}
+                  onChange={(v, live) => updateCloner(layer.id, (x) => (x.spacingX = v), live)} />
+              </Row>
+            </>
+          )}
+          <Row>
+            <Label>Step scale</Label>
+            <NumberInput value={c.stepScale} suffix="%" onCommitStart={beginChange}
+              onChange={(v, live) => updateCloner(layer.id, (x) => (x.stepScale = v), live)} />
+          </Row>
+          <Row>
+            <Label>Step rotate</Label>
+            <NumberInput value={c.stepRotation} suffix="°" onCommitStart={beginChange}
+              onChange={(v, live) => updateCloner(layer.id, (x) => (x.stepRotation = v), live)} />
+          </Row>
+          <Row>
+            <Label>Step fade</Label>
+            <NumberInput value={c.stepOpacity} suffix="%" onCommitStart={beginChange}
+              onChange={(v, live) => updateCloner(layer.id, (x) => (x.stepOpacity = v), live)} />
+          </Row>
+          <Row>
+            <Label>Stagger</Label>
+            <NumberInput value={c.stagger} step={0.01} min={0} suffix="s" onCommitStart={beginChange}
+              onChange={(v, live) => updateCloner(layer.id, (x) => (x.stagger = v), live)} />
+          </Row>
+        </>
+      )}
+    </Section>
+  );
+}
 
 function EffectsSection({ layer }: { layer: Layer }) {
   const update = useStore((s) => s.update);

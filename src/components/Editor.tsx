@@ -10,6 +10,7 @@ import { PropertiesPanel } from "@/components/panels/PropertiesPanel";
 import { ExportPanel } from "@/components/panels/ExportPanel";
 import { PrinciplesPanel } from "@/components/panels/PrinciplesPanel";
 import { SettingsPanel } from "@/components/panels/SettingsPanel";
+import { ExamplesPanel } from "@/components/panels/ExamplesPanel";
 import { Splitter } from "@/components/ui/Splitter";
 
 export function Editor() {
@@ -137,6 +138,7 @@ export function Editor() {
       <ExportPanel />
       <PrinciplesPanel />
       <SettingsPanel />
+      <ExamplesPanel />
     </div>
   );
 }

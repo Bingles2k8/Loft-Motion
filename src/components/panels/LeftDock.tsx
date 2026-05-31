@@ -3,8 +3,9 @@
 import { useStore } from "@/lib/store/useStore";
 import { ProjectPanel } from "@/components/panels/ProjectPanel";
 import { EffectsPanel } from "@/components/panels/EffectsPanel";
+import { BehaviorsBrowsePanel } from "@/components/panels/BehaviorsBrowsePanel";
 
-/** Tabbed left column: Project ⇄ Effects (AE docks these together). */
+/** Tabbed left column: Project ⇄ Effects ⇄ Behaviors. */
 export function LeftDock() {
   const leftTab = useStore((s) => s.leftTab);
   const setLeftTab = useStore((s) => s.setLeftTab);
@@ -18,9 +19,14 @@ export function LeftDock() {
         <Tab active={leftTab === "effects"} onClick={() => setLeftTab("effects")}>
           Effects
         </Tab>
+        <Tab active={leftTab === "behaviors"} onClick={() => setLeftTab("behaviors")}>
+          Behaviors
+        </Tab>
       </div>
       <div className="min-h-0 flex-1">
-        {leftTab === "project" ? <ProjectPanel /> : <EffectsPanel />}
+        {leftTab === "project" && <ProjectPanel />}
+        {leftTab === "effects" && <EffectsPanel />}
+        {leftTab === "behaviors" && <BehaviorsBrowsePanel />}
       </div>
     </div>
   );

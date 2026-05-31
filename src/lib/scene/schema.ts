@@ -222,6 +222,83 @@ export const zTiming = z.object({
 });
 export type Timing = z.infer<typeof zTiming>;
 
+/* -------------------------------------------------------------------------- */
+/*  Procedural behaviors (Cavalry-style)                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A behavior continuously drives a transform channel over time as a pure
+ * function of t — no keyframes. Behaviors STACK on a layer and add their offset
+ * on top of the keyframed/static base value, so they compose with everything.
+ */
+export const BEHAVIOR_TYPES = [
+  "wiggle",
+  "oscillate",
+  "spin",
+  "spring",
+  "orbit",
+] as const;
+export type BehaviorType = (typeof BEHAVIOR_TYPES)[number];
+
+/** Which transform channel(s) a behavior targets. */
+export const BEHAVIOR_TARGETS = [
+  "position",
+  "x",
+  "y",
+  "scale",
+  "rotation",
+  "opacity",
+] as const;
+export type BehaviorTarget = (typeof BEHAVIOR_TARGETS)[number];
+
+export const zBehavior = z.object({
+  id: z.string(),
+  type: z.enum(BEHAVIOR_TYPES),
+  enabled: z.boolean().default(true),
+  target: z.enum(BEHAVIOR_TARGETS),
+  /** Master intensity (0..1+), the one knob beginners touch. */
+  strength: z.number().default(1),
+  /** Type-specific numeric params, e.g. { freq, amp, octaves, seed }. */
+  params: z.record(z.string(), z.number()).default({}),
+  /** Seamlessly loop the behavior over the composition duration. */
+  loop: z.boolean().default(false),
+});
+export type Behavior = z.infer<typeof zBehavior>;
+
+/* -------------------------------------------------------------------------- */
+/*  Cloner (per-layer Duplicator)                                              */
+/* -------------------------------------------------------------------------- */
+
+export const CLONER_MODES = ["grid", "radial", "line"] as const;
+export type ClonerMode = (typeof CLONER_MODES)[number];
+
+/**
+ * Multiplies a layer into N copies arranged in a grid / circle / line, with a
+ * per-clone incremental transform and a stagger that delays each clone's
+ * behaviors — the signature procedural look.
+ */
+export const zCloner = z.object({
+  enabled: z.boolean().default(false),
+  mode: z.enum(CLONER_MODES).default("grid"),
+  // grid
+  cols: z.number().int().min(1).default(5),
+  rows: z.number().int().min(1).default(1),
+  spacingX: z.number().default(120),
+  spacingY: z.number().default(120),
+  // radial
+  count: z.number().int().min(1).default(8),
+  radius: z.number().default(220),
+  startAngle: z.number().default(0),
+  faceOut: z.boolean().default(false),
+  // per-clone incremental transform
+  stepScale: z.number().default(0), // each clone +N% scale
+  stepRotation: z.number().default(0), // each clone +N°
+  stepOpacity: z.number().default(0), // each clone +N% opacity (negative fades)
+  /** Per-clone time delay (s) applied to this layer's behaviors → cascades. */
+  stagger: z.number().default(0),
+});
+export type Cloner = z.infer<typeof zCloner>;
+
 export const zLayer = z.object({
   id: z.string(),
   name: z.string(),
@@ -233,6 +310,8 @@ export const zLayer = z.object({
   transform: zTransform,
   timing: zTiming,
   effects: z.array(zEffect).default([]),
+  behaviors: z.array(zBehavior).default([]),
+  cloner: zCloner.optional(),
 
   // Payloads — exactly one is present, matching `type`.
   shape: zShapePayload.optional(),

@@ -188,6 +188,14 @@ export const IconMenu = (p: P) => (
     <path d="M3 6h18M3 12h18M3 18h18" />
   </svg>
 );
+export const IconGrid = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
 export const IconStopwatch = (p: P) => (
   <svg {...base(p)}>
     <circle cx="12" cy="13" r="8" />

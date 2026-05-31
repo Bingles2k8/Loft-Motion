@@ -10,6 +10,10 @@ import {
   type Animatable,
   type Asset,
   type AssetType,
+  type Behavior,
+  type BehaviorTarget,
+  type BehaviorType,
+  type Cloner,
   type Composition,
   type Effect,
   type EffectType,
@@ -21,6 +25,7 @@ import {
   type Transform,
 } from "@/lib/scene/schema";
 import { effectDef } from "@/lib/effects/catalog";
+import { defaultBehaviorParams } from "@/lib/anim/behaviors";
 
 /** Short unique id; crypto.randomUUID where available, else a fallback. */
 export function uid(prefix = "id"): string {
@@ -97,6 +102,7 @@ export function createShapeLayer(
     transform: defaultTransform(x, y),
     timing: { start: 0, end: 5 },
     effects: [],
+    behaviors: [],
     shape: {
       kind,
       width: kind === "ellipse" ? 280 : 320,
@@ -121,6 +127,7 @@ export function createTextLayer(init: LayerInit = {}): Layer {
     transform: defaultTransform(x, y),
     timing: { start: 0, end: 5 },
     effects: [],
+    behaviors: [],
     text: {
       content: "Loft Motion",
       fontSize: 120,
@@ -151,7 +158,44 @@ export function createImageLayer(
     transform: defaultTransform(x, y),
     timing: { start: 0, end: 5 },
     effects: [],
+    behaviors: [],
     image: { assetId, src, naturalWidth, naturalHeight },
+  };
+}
+
+/** Create a behavior with sensible defaults (the "it just works" values). */
+export function createBehavior(
+  type: BehaviorType,
+  target: BehaviorTarget = type === "spin" ? "rotation" : type === "spring" ? "scale" : "position",
+): Behavior {
+  return {
+    id: uid("beh"),
+    type,
+    enabled: true,
+    target,
+    strength: 1,
+    params: defaultBehaviorParams(type),
+    loop: type === "wiggle" || type === "oscillate",
+  };
+}
+
+/** A default cloner config (disabled until the user turns it on). */
+export function createCloner(): Cloner {
+  return {
+    enabled: true,
+    mode: "grid",
+    cols: 5,
+    rows: 1,
+    spacingX: 140,
+    spacingY: 140,
+    count: 8,
+    radius: 220,
+    startAngle: 0,
+    faceOut: false,
+    stepScale: 0,
+    stepRotation: 0,
+    stepOpacity: 0,
+    stagger: 0.08,
   };
 }
 
