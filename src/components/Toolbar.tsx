@@ -68,6 +68,7 @@ export function Toolbar() {
   const setShowExport = useStore((s) => s.setShowExport);
   const setShowSettings = useStore((s) => s.setShowSettings);
   const setShowExamples = useStore((s) => s.setShowExamples);
+  const setShowShortcuts = useStore((s) => s.setShowShortcuts);
   const setShowPrinciples = useStore((s) => s.setShowPrinciples);
   const showPrinciples = useStore((s) => s.showPrinciples);
   const setLeftTab = useStore((s) => s.setLeftTab);
@@ -197,6 +198,11 @@ export function Toolbar() {
         <IconGrid width={15} height={15} />
         Examples
       </button>
+
+      {/* Keyboard shortcuts */}
+      <ToolButton title="Keyboard shortcuts (?)" onClick={() => setShowShortcuts(true)}>
+        <span className="text-sm font-semibold">?</span>
+      </ToolButton>
 
       {/* Import (scene JSON or media) / save scene */}
       <ToolButton

@@ -11,6 +11,7 @@ import { ExportPanel } from "@/components/panels/ExportPanel";
 import { PrinciplesPanel } from "@/components/panels/PrinciplesPanel";
 import { SettingsPanel } from "@/components/panels/SettingsPanel";
 import { ExamplesPanel } from "@/components/panels/ExamplesPanel";
+import { ShortcutsPanel } from "@/components/panels/ShortcutsPanel";
 import { Splitter } from "@/components/ui/Splitter";
 
 export function Editor() {
@@ -63,27 +64,55 @@ export function Editor() {
       }
       if (typing) return;
 
+      const frame = 1 / s.scene.composition.fps;
+      const key = e.key.toLowerCase();
+
+      // AE-style "reveal property" solo shortcuts on the selected layer.
+      const soloProp = (path: string) => {
+        if (!s.selectedLayerId) return;
+        s.setExpanded(s.selectedLayerId, true);
+        s.clearSoloChannels(s.selectedLayerId);
+        s.toggleSoloChannel(s.selectedLayerId, path);
+      };
+
       if (e.code === "Space") {
         e.preventDefault();
         s.togglePlay();
       } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (s.selectedKeys.length > 0) {
-          s.deleteSelection();
-        } else if (s.selectedLayerId) {
-          s.removeLayer(s.selectedLayerId);
-        }
+        if (s.selectedKeys.length > 0) s.deleteSelection();
+        else if (s.selectedLayerId) s.removeLayer(s.selectedLayerId);
       } else if (e.key === "Home") {
         s.setTime(0);
-      } else if (e.key === "ArrowLeft" && s.selectedKeys.length > 0) {
+      } else if (e.key === "End") {
+        s.setTime(s.scene.composition.duration);
+      } else if (e.key === "ArrowLeft") {
         e.preventDefault();
-        s.beginChange();
-        s.nudgeSelection(-1 / s.scene.composition.fps);
-      } else if (e.key === "ArrowRight" && s.selectedKeys.length > 0) {
+        if (s.selectedKeys.length > 0) {
+          s.beginChange();
+          s.nudgeSelection(-frame);
+        } else {
+          s.setTime(Math.max(0, s.time - frame)); // step back one frame
+        }
+      } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        s.beginChange();
-        s.nudgeSelection(1 / s.scene.composition.fps);
-      } else if (e.key.toLowerCase() === "g" && e.shiftKey) {
+        if (s.selectedKeys.length > 0) {
+          s.beginChange();
+          s.nudgeSelection(frame);
+        } else {
+          s.setTime(Math.min(s.scene.composition.duration, s.time + frame));
+        }
+      } else if (key === "g" && e.shiftKey) {
         s.toggleGraphMode();
+      } else if (key === "?" || (key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        s.setShowShortcuts(true);
+      } else if (s.selectedLayerId) {
+        // Single-key property reveals (AE: P/S/R/T/U).
+        if (key === "p") soloProp("transform.x");
+        else if (key === "s") soloProp("transform.scaleX");
+        else if (key === "r") soloProp("transform.rotation");
+        else if (key === "t") soloProp("transform.opacity");
+        else if (key === "u") s.clearSoloChannels(s.selectedLayerId);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -139,6 +168,7 @@ export function Editor() {
       <PrinciplesPanel />
       <SettingsPanel />
       <ExamplesPanel />
+      <ShortcutsPanel />
     </div>
   );
 }

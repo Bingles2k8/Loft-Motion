@@ -19,22 +19,45 @@ import {
   startDrag,
 } from "@/components/timeline/shared";
 import {
+  IconAdjust,
   IconChevron,
   IconEye,
   IconEyeOff,
   IconGraph,
+  IconImage,
   IconLoop,
+  IconNull,
   IconPause,
   IconPlay,
+  IconSquare,
   IconStopwatch,
   IconStop,
+  IconText,
 } from "@/components/ui/icons";
+import type { LayerType } from "@/lib/scene/schema";
 
 interface Marquee {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
+}
+
+/** A small glyph indicating a layer's type, AE-style. */
+function LayerTypeIcon({ type }: { type: LayerType }) {
+  const cls = "shrink-0 text-haze-500";
+  switch (type) {
+    case "text":
+      return <IconText width={12} height={12} className={cls} />;
+    case "image":
+      return <IconImage width={12} height={12} className={cls} />;
+    case "null":
+      return <IconNull width={12} height={12} className={cls} />;
+    case "adjustment":
+      return <IconAdjust width={12} height={12} className={cls} />;
+    default:
+      return <IconSquare width={12} height={12} className={cls} />;
+  }
 }
 
 export function Timeline() {
@@ -141,6 +164,22 @@ export function Timeline() {
         </TransportButton>
         <TransportButton active={loop} onClick={toggleLoop} title="Loop">
           <IconLoop />
+        </TransportButton>
+
+        <div className="mx-1 h-4 w-px bg-ink-700" />
+
+        {/* Frame step */}
+        <TransportButton
+          onClick={() => setTime(Math.max(0, time - 1 / fps))}
+          title="Previous frame (←)"
+        >
+          <span className="text-xs leading-none">◂</span>
+        </TransportButton>
+        <TransportButton
+          onClick={() => setTime(Math.min(duration, time + 1 / fps))}
+          title="Next frame (→)"
+        >
+          <span className="text-xs leading-none">▸</span>
         </TransportButton>
 
         <div className="ml-2 font-mono text-xs tabular-nums">
@@ -394,8 +433,9 @@ function LayerLabel({ layer, expanded }: { layer: Layer; expanded: boolean }) {
         >
           {layer.locked ? "L" : "l"}
         </button>
-        <span className={`flex-1 truncate text-xs ${selected ? "text-haze-200" : "text-haze-300"} ${layer.locked ? "opacity-50" : ""}`}>
-          {layer.name}
+        <span className={`flex flex-1 items-center gap-1.5 truncate text-xs ${selected ? "text-haze-200" : "text-haze-300"} ${layer.locked ? "opacity-50" : ""}`}>
+          <LayerTypeIcon type={layer.type} />
+          <span className="truncate">{layer.name}</span>
         </span>
         {expanded && <SoloMenu layer={layer} />}
         <CompatBadge level={layerLevelFor(layer, activeTarget)} target={activeTarget} />
