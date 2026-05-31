@@ -35,6 +35,86 @@ export const TARGET_LABEL: Record<ExportTarget, string> = {
   css: "CSS",
 };
 
+/** Per-target glyph shown alongside the status icon (MP4 / Lottie / CSS). */
+export const TARGET_GLYPH: Record<ExportTarget, string> = {
+  mp4: "MP4",
+  lottie: "LOT",
+  css: "CSS",
+};
+
+/**
+ * A small status icon for one compatibility level (the 3 states):
+ *  full  → check, partial → warning triangle, none → blocked circle.
+ * Keeps the existing colour scheme (emerald / amber / rose).
+ */
+export function CompatStatusIcon({
+  level,
+  size = 12,
+}: {
+  level: CompatLevel;
+  size?: number;
+}) {
+  const m = LEVEL_META[level];
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2.4,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  return (
+    <span className={`inline-flex ${m.color}`}>
+      {level === "full" && (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" strokeWidth={1.6} opacity={0.5} />
+          <path d="M8 12.5l2.5 2.5 5-5.5" />
+        </svg>
+      )}
+      {level === "partial" && (
+        <svg {...common}>
+          <path d="M12 3l9.5 16.5H2.5L12 3z" strokeWidth={1.8} />
+          <path d="M12 10v4" />
+          <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
+        </svg>
+      )}
+      {level === "none" && (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" strokeWidth={1.8} />
+          <path d="M7 7l10 10" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A compact per-target chip: the target name + its status icon. Used in the
+ * Effects panel (replacing the dots) and the Export-compatibility section.
+ */
+export function CompatTargetIcon({
+  target,
+  level,
+  showLabel = true,
+}: {
+  target: ExportTarget;
+  level: CompatLevel;
+  showLabel?: boolean;
+}) {
+  const m = LEVEL_META[level];
+  return (
+    <span
+      title={`${TARGET_LABEL[target]}: ${m.label}`}
+      className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] font-bold tracking-wide ${m.bg} ${m.color}`}
+    >
+      {showLabel && <span>{TARGET_GLYPH[target]}</span>}
+      <CompatStatusIcon level={level} size={10} />
+    </span>
+  );
+}
+
 /** A tiny coloured dot for a single compatibility level. */
 export function CompatDot({
   level,

@@ -1,25 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function Section({
   title,
   right,
   children,
+  collapsible = false,
+  defaultOpen = true,
 }: {
   title: string;
   right?: React.ReactNode;
   children: React.ReactNode;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const expanded = collapsible ? open : true;
+
   return (
     <div className="border-b border-ink-700 px-3 py-2.5">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-haze-500">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          disabled={!collapsible}
+          onClick={() => collapsible && setOpen((o) => !o)}
+          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-haze-500 transition hover:text-haze-300 disabled:cursor-default"
+        >
+          {collapsible && (
+            <svg
+              width={9}
+              height={9}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={3}
+              className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+            >
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          )}
           {title}
-        </h3>
+        </button>
         {right}
       </div>
-      <div className="space-y-1.5">{children}</div>
+      {expanded && <div className="mt-2 space-y-1.5">{children}</div>}
     </div>
   );
 }
@@ -34,7 +59,14 @@ export function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A debounced-ish controlled number input (commits on blur/enter + live). */
+/**
+ * A scrubbable + typeable number field (After Effects-style).
+ *
+ * Hover → `ew-resize` cursor; press-drag anywhere on the field scrubs the value
+ * (Shift = fine, ×0.1). A press WITHOUT a drag focuses the field for typing and
+ * selects the text. While focused/typing, scrubbing is disabled. Commits live
+ * during scrub/typing and a final non-live commit on release/blur.
+ */
 export function NumberInput({
   value,
   onChange,
@@ -54,6 +86,9 @@ export function NumberInput({
 }) {
   const [draft, setDraft] = useState(String(round(value)));
   const [editing, setEditing] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const clampN = (n: number) => {
     if (min !== undefined) n = Math.max(min, n);
     if (max !== undefined) n = Math.min(max, n);
@@ -69,25 +104,39 @@ export function NumberInput({
     onChange(clampN(n), live);
   };
 
-  // AE-style scrubbing: drag the value horizontally to change it.
-  const onScrubDown = (e: React.PointerEvent) => {
-    if (editing) return;
-    e.preventDefault();
+  // Press → maybe-scrub. Threshold of a few px distinguishes a scrub from a
+  // click; a click (no movement) focuses the input for typing.
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (editing || e.button !== 0) return;
     const startX = e.clientX;
     const startVal = value;
+    // px-per-unit sensitivity: scale with the step so fine params scrub finely.
     const perPx = (step || 1) * (e.shiftKey ? 0.1 : 1);
-    onCommitStart?.();
-    let moved = false;
+    let started = false;
+
     const move = (ev: PointerEvent) => {
-      moved = true;
-      const next = clampN(startVal + (ev.clientX - startX) * perPx);
+      const dx = ev.clientX - startX;
+      if (!started && Math.abs(dx) < 3) return; // tolerance before scrubbing
+      if (!started) {
+        started = true;
+        setScrubbing(true);
+        onCommitStart?.();
+      }
+      const next = clampN(startVal + dx * perPx);
       setDraft(String(round(next)));
       onChange(next, true);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      if (moved) onChange(clampN(value), false);
+      if (started) {
+        setScrubbing(false);
+        onChange(clampN(value), false);
+      } else {
+        // No drag → treat as a click: focus & select for typing.
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -96,9 +145,11 @@ export function NumberInput({
   return (
     <div className="relative flex-1">
       <input
-        type="number"
-        step={step}
+        ref={inputRef}
+        type="text"
+        inputMode="decimal"
         value={draft}
+        readOnly={!editing}
         onFocus={() => {
           setEditing(true);
           onCommitStart?.();
@@ -114,14 +165,21 @@ export function NumberInput({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
-        className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 tabular-nums focus:border-brand-400 focus:outline-none"
+        className={`w-full rounded border bg-ink-900 px-2 py-1 text-xs tabular-nums focus:outline-none ${
+          editing
+            ? "border-brand-400 text-haze-200"
+            : "border-ink-600 text-haze-200 hover:border-ink-500"
+        } ${scrubbing ? "border-brand-400" : ""}`}
+        style={editing ? undefined : { cursor: "ew-resize" }}
       />
-      {/* Scrub strip: a thin grab zone on the left edge of the field. */}
-      <div
-        onPointerDown={onScrubDown}
-        title="Drag to scrub (Shift for fine)"
-        className="lm-scrub absolute inset-y-0 left-0 w-3"
-      />
+      {/* Full-field scrub surface (only active when not typing). */}
+      {!editing && (
+        <div
+          onPointerDown={onPointerDown}
+          title="Drag to scrub · click to type · Shift for fine"
+          className="lm-scrub absolute inset-0"
+        />
+      )}
       {suffix && (
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-haze-500">
           {suffix}

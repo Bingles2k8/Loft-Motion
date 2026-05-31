@@ -10,7 +10,7 @@ import {
 } from "@/lib/effects/catalog";
 import { createEffect } from "@/lib/scene/factory";
 import { EXPORT_TARGETS, type EffectType } from "@/lib/scene/schema";
-import { LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
+import { CompatTargetIcon } from "@/components/ui/compat";
 import { PanelHeader } from "@/components/panels/ProjectPanel";
 import { IconSearch } from "@/components/ui/icons";
 
@@ -116,18 +116,10 @@ function EffectRow({
         <div className="text-xs font-medium text-haze-200">{def.label}</div>
         <div className="truncate text-[10px] text-haze-500">{def.description}</div>
       </div>
-      <div className="mt-0.5 flex shrink-0 items-center gap-1">
-        {EXPORT_TARGETS.map((t) => {
-          const c = effectCompat(def.type, t);
-          const m = LEVEL_META[c.level];
-          return (
-            <span
-              key={t}
-              title={`${TARGET_LABEL[t]}: ${c.note ?? m.label}`}
-              className={`h-1.5 w-1.5 rounded-full ${m.dot}`}
-            />
-          );
-        })}
+      <div className="mt-0.5 flex shrink-0 flex-col items-end gap-0.5">
+        {EXPORT_TARGETS.map((t) => (
+          <CompatTargetIcon key={t} target={t} level={effectCompat(def.type, t).level} />
+        ))}
       </div>
     </button>
   );

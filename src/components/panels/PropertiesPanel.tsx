@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useStore, type KfRef } from "@/lib/store/useStore";
 import { evalAnimatable, isAnimated, keyframeBezier } from "@/lib/anim/evaluate";
 import { EASINGS, EASING_NAMES } from "@/lib/anim/easing";
@@ -24,7 +25,7 @@ import {
   type SceneDocument,
   type ShapeKind,
 } from "@/lib/scene/schema";
-import { LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
+import { CompatStatusIcon, LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
 import {
   ColorInput,
   Label,
@@ -34,7 +35,7 @@ import {
   Select,
   TextInput,
 } from "@/components/panels/fields";
-import { IconKey, IconPlus, IconTrash } from "@/components/ui/icons";
+import { IconChevron, IconKey, IconPlus, IconTrash } from "@/components/ui/icons";
 
 type TextAlign = (typeof TEXT_ALIGN)[number];
 
@@ -286,6 +287,7 @@ function LayerProperties({ layer }: { layer: Layer }) {
     <>
       <Section
         title="Layer"
+        collapsible
         right={
           <div className="flex gap-1">
             <button
@@ -336,14 +338,14 @@ function LayerProperties({ layer }: { layer: Layer }) {
         </Row>
       </Section>
 
-      <Section title="Transform">
+      <Section title="Transform" collapsible>
         {TRANSFORM_CHANNELS.map((c) => (
           <ChannelField key={c.path} layer={layer} channel={c} />
         ))}
       </Section>
 
       {layer.type === "shape" && shape && (
-        <Section title="Shape">
+        <Section title="Shape" collapsible>
           <Row>
             <Label>Kind</Label>
             <Select
@@ -459,7 +461,7 @@ function LayerProperties({ layer }: { layer: Layer }) {
       )}
 
       {layer.type === "text" && text && (
-        <Section title="Text">
+        <Section title="Text" collapsible>
           <Row>
             <Label>Content</Label>
             <TextInput
@@ -526,6 +528,7 @@ function EffectsSection({ layer }: { layer: Layer }) {
   return (
     <Section
       title="Effects"
+      collapsible
       right={
         <Select
           value=""
@@ -543,66 +546,93 @@ function EffectsSection({ layer }: { layer: Layer }) {
           export badges; most shader effects render in MP4 only.
         </p>
       )}
-      {layer.effects.map((fx) => {
-        const def = effectDef(fx.type);
-        const setColor = (field: "color" | "color2", v: string) =>
-          update((s) => {
-            const f = s.layers
-              .find((x) => x.id === layer.id)
-              ?.effects.find((y) => y.id === fx.id);
-            if (f) f[field] = v;
-          });
-        return (
-          <div key={fx.id} className="rounded border border-ink-700 p-2">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-xs font-semibold text-haze-200">{def.label}</span>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-[10px] text-haze-400">
-                  <input
-                    type="checkbox"
-                    checked={fx.enabled}
-                    onChange={(e) =>
-                      update((s) => {
-                        const f = s.layers
-                          .find((x) => x.id === layer.id)
-                          ?.effects.find((y) => y.id === fx.id);
-                        if (f) f.enabled = e.target.checked;
-                      })
-                    }
-                  />
-                  on
-                </label>
-                <button
-                  onClick={() =>
-                    update((s) => {
-                      const l = s.layers.find((x) => x.id === layer.id);
-                      if (l) l.effects = l.effects.filter((y) => y.id !== fx.id);
-                    })
-                  }
-                  className="text-haze-400 transition hover:text-rose-300"
-                >
-                  <IconTrash width={13} height={13} />
-                </button>
-              </div>
-            </div>
-            {def.colors?.map((cdef) => (
-              <Row key={cdef.field}>
-                <Label>{cdef.label}</Label>
-                <ColorInput
-                  value={(cdef.field === "color" ? fx.color : fx.color2) ?? cdef.default}
-                  onChange={(v) => setColor(cdef.field, v)}
-                />
-              </Row>
-            ))}
-            {effectChannels(layer)
-              .filter((c) => c.path.includes(fx.id))
-              .map((c) => (
-                <ChannelField key={c.path} layer={layer} channel={c} />
-              ))}
-          </div>
-        );
-      })}
+      {layer.effects.map((fx) => (
+        <EffectCard key={fx.id} layerId={layer.id} layer={layer} fxId={fx.id} />
+      ))}
     </Section>
+  );
+}
+
+/** A single collapsible effect card. */
+function EffectCard({
+  layerId,
+  layer,
+  fxId,
+}: {
+  layerId: string;
+  layer: Layer;
+  fxId: string;
+}) {
+  const update = useStore((s) => s.update);
+  const [open, setOpen] = useState(true);
+  const fx = layer.effects.find((e) => e.id === fxId);
+  if (!fx) return null;
+  const def = effectDef(fx.type);
+
+  const setColor = (field: "color" | "color2", v: string) =>
+    update((s) => {
+      const f = s.layers.find((x) => x.id === layerId)?.effects.find((y) => y.id === fxId);
+      if (f) f[field] = v;
+    });
+
+  return (
+    <div className="rounded border border-ink-700">
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className={`grid h-4 w-4 place-items-center text-haze-500 transition hover:text-haze-200 ${
+            open ? "rotate-90" : ""
+          }`}
+        >
+          <IconChevron width={11} height={11} />
+        </button>
+        <span className="flex-1 text-xs font-semibold text-haze-200">{def.label}</span>
+        <label className="flex items-center gap-1 text-[10px] text-haze-400">
+          <input
+            type="checkbox"
+            checked={fx.enabled}
+            onChange={(e) =>
+              update((s) => {
+                const f = s.layers
+                  .find((x) => x.id === layerId)
+                  ?.effects.find((y) => y.id === fxId);
+                if (f) f.enabled = e.target.checked;
+              })
+            }
+          />
+          on
+        </label>
+        <button
+          onClick={() =>
+            update((s) => {
+              const l = s.layers.find((x) => x.id === layerId);
+              if (l) l.effects = l.effects.filter((y) => y.id !== fxId);
+            })
+          }
+          className="text-haze-400 transition hover:text-rose-300"
+        >
+          <IconTrash width={13} height={13} />
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-1.5 border-t border-ink-800 p-2">
+          {def.colors?.map((cdef) => (
+            <Row key={cdef.field}>
+              <Label>{cdef.label}</Label>
+              <ColorInput
+                value={(cdef.field === "color" ? fx.color : fx.color2) ?? cdef.default}
+                onChange={(v) => setColor(cdef.field, v)}
+              />
+            </Row>
+          ))}
+          {effectChannels(layer)
+            .filter((c) => c.path.includes(fxId))
+            .map((c) => (
+              <ChannelField key={c.path} layer={layer} channel={c} />
+            ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -617,7 +647,20 @@ function CapabilitySection({
 }) {
   const report = analyzeScene(scene);
   return (
-    <Section title="Export compatibility">
+    <Section
+      title="Export compatibility"
+      collapsible
+      right={
+        <div className="flex items-center gap-1">
+          {EXPORT_TARGETS.map((target) => {
+            const lr = report[target].layers.find((l) => l.layerId === layer.id);
+            return (
+              <CompatStatusIcon key={target} level={lr?.level ?? "full"} />
+            );
+          })}
+        </div>
+      }
+    >
       <div className="space-y-2">
         {EXPORT_TARGETS.map((target) => {
           const lr = report[target].layers.find((l) => l.layerId === layer.id);
@@ -626,8 +669,8 @@ function CapabilitySection({
           const issues = lr.findings.filter((f) => f.level !== "full");
           return (
             <div key={target} className="rounded-md border border-ink-700 p-2">
-              <div className="flex items-center gap-2">
-                <span className={`inline-block h-2 w-2 rounded-full ${m.dot}`} />
+              <div className="flex items-center gap-1.5">
+                <CompatStatusIcon level={lr.level} />
                 <span className="text-xs font-semibold text-haze-200">
                   {TARGET_LABEL[target]}
                 </span>
