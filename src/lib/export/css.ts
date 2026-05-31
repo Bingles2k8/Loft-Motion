@@ -12,7 +12,7 @@
 import { bezierToCss } from "@/lib/anim/easing";
 import { isAnimated, keyframeBezier } from "@/lib/anim/evaluate";
 import { analyzeScene } from "@/lib/capability/engine";
-import type { Animatable, Layer, SceneDocument } from "@/lib/scene/schema";
+import { flattenPalette, type Animatable, type Layer, type SceneDocument } from "@/lib/scene/schema";
 
 interface Emit {
   rules: string[]; // @keyframes blocks
@@ -160,7 +160,8 @@ export interface CssExport {
   document: string;
 }
 
-export function exportCss(scene: SceneDocument): CssExport {
+export function exportCss(rawScene: SceneDocument): CssExport {
+  const scene = flattenPalette(rawScene);
   kfCounter = 0;
   const report = analyzeScene(scene).css;
   const warnings = report.issues

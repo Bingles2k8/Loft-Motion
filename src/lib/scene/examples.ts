@@ -75,6 +75,7 @@ function doc(name: string, layers: Layer[], bg = "#0e0e12", duration = 5): Scene
     composition: { ...defaultComposition(), background: bg, duration },
     layers,
     assets: [],
+    palette: { swatches: [] },
   };
 }
 

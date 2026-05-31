@@ -16,6 +16,7 @@ import { createBehavior, createCloner, createEffect, kf as makeKf } from "@/lib/
 import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
 import { BEHAVIOR_LIST, behaviorDef } from "@/lib/anim/behaviorCatalog";
 import { applyPreset, BEHAVIOR_PRESETS } from "@/lib/anim/behaviors";
+import { AUTO_ANIMATE_LABELS, AUTO_ANIMATE_PRESETS } from "@/lib/anim/autoAnimate";
 import { CLONER_MODES, type BehaviorType } from "@/lib/scene/schema";
 import {
   BLEND_MODES,
@@ -341,6 +342,9 @@ function LayerProperties({ layer }: { layer: Layer }) {
         </Row>
       </Section>
 
+      <AlignSection layer={layer} />
+      <AutoAnimateSection layer={layer} />
+
       <Section title="Transform" collapsible>
         {TRANSFORM_CHANNELS.map((c) => (
           <ChannelField key={c.path} layer={layer} channel={c} />
@@ -520,6 +524,82 @@ function LayerProperties({ layer }: { layer: Layer }) {
 }
 
 /* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*  Align (to composition frame)                                               */
+/* -------------------------------------------------------------------------- */
+
+function AlignSection({ layer }: { layer: Layer }) {
+  const alignToComp = useStore((s) => s.alignToComp);
+  const ops: Array<{ op: "left" | "centerX" | "right" | "top" | "centerY" | "bottom"; label: string }> = [
+    { op: "left", label: "⤛" },
+    { op: "centerX", label: "↔" },
+    { op: "right", label: "⤜" },
+    { op: "top", label: "⤒" },
+    { op: "centerY", label: "↕" },
+    { op: "bottom", label: "⤓" },
+  ];
+  return (
+    <Section title="Align to frame" collapsible defaultOpen={false}>
+      <div className="grid grid-cols-6 gap-1">
+        {ops.map(({ op, label }) => (
+          <button
+            key={op}
+            onClick={() => alignToComp(layer.id, op)}
+            title={`Align ${op}`}
+            className="grid h-7 place-items-center rounded bg-ink-700 text-sm text-haze-300 transition hover:bg-ink-600 hover:text-haze-100"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Auto-Animate (one-click transitions)                                       */
+/* -------------------------------------------------------------------------- */
+
+function AutoAnimateSection({ layer }: { layer: Layer }) {
+  const autoAnimate = useStore((s) => s.autoAnimate);
+  const [mode, setMode] = useState<"in" | "out" | "both">("in");
+
+  return (
+    <Section
+      title="Auto-Animate"
+      collapsible
+      defaultOpen={false}
+      right={
+        <Select
+          value={mode}
+          onChange={(v) => setMode(v as "in" | "out" | "both")}
+          options={[
+            { value: "in", label: "In" },
+            { value: "out", label: "Out" },
+            { value: "both", label: "In + Out" },
+          ]}
+        />
+      }
+    >
+      <p className="text-[11px] text-haze-500">
+        One-click polished transitions with magic easing — applied to this
+        layer&apos;s transform.
+      </p>
+      <div className="grid grid-cols-2 gap-1">
+        {AUTO_ANIMATE_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            onClick={() => autoAnimate(layer.id, preset, mode)}
+            className="rounded bg-ink-700 px-2 py-1.5 text-[11px] text-haze-200 transition hover:bg-ink-600"
+          >
+            {AUTO_ANIMATE_LABELS[preset]}
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Behaviors (procedural)                                                     */

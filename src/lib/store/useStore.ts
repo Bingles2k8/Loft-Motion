@@ -19,8 +19,26 @@ import {
   type Keyframe,
   type Layer,
   type SceneDocument,
+  type Swatch,
 } from "@/lib/scene/schema";
 import { sampleScene } from "@/lib/scene/factory";
+import {
+  computeAlign,
+  computeDistribute,
+  type AlignOp,
+  type DistributeOp,
+} from "@/lib/scene/align";
+import { applyAutoAnimate, type AutoAnimatePreset } from "@/lib/anim/autoAnimate";
+import { layerSize } from "@/lib/render/viewport";
+
+/** Half-extents of a layer's box at its current static scale (comp px). */
+function layerHalfExtents(l: Layer): { w: number; h: number } {
+  const s = layerSize(l);
+  return {
+    w: (s.x * (l.transform.scaleX.value / 100)) / 2,
+    h: (s.y * (l.transform.scaleY.value / 100)) / 2,
+  };
+}
 
 const HISTORY_LIMIT = 100;
 
@@ -63,7 +81,7 @@ function loadSizes(): PanelSizes {
   return DEFAULT_SIZES;
 }
 
-export type LeftTab = "project" | "effects" | "behaviors";
+export type LeftTab = "project" | "effects" | "behaviors" | "palette";
 
 export interface StoreState {
   scene: SceneDocument;
@@ -133,6 +151,28 @@ export interface StoreState {
   ) => void;
   setCloner: (layerId: string, cloner: Cloner | undefined) => void;
   updateCloner: (layerId: string, patch: (c: Cloner) => void, live?: boolean) => void;
+
+  // Palette (shared styles)
+  addSwatch: (swatch: Swatch) => void;
+  removeSwatch: (id: string) => void;
+  updateSwatch: (id: string, patch: (s: Swatch) => void, live?: boolean) => void;
+  applyPaletteTheme: (swatches: Swatch[]) => void;
+
+  // Layer organization
+  toggleLayerSolo: (id: string) => void;
+  toggleLayerLock: (id: string) => void;
+  setLayerLabel: (id: string, label: number) => void;
+
+  // Align / distribute / auto-animate (operate on a set of layer ids)
+  alignLayers: (ids: string[], op: AlignOp) => void;
+  distributeLayers: (ids: string[], op: DistributeOp) => void;
+  /** Align a single layer relative to the composition frame. */
+  alignToComp: (id: string, op: AlignOp) => void;
+  autoAnimate: (
+    id: string,
+    preset: AutoAnimatePreset,
+    mode: "in" | "out" | "both",
+  ) => void;
 
   // Keyframes
   addKeyframe: (layerId: string, channelPath: string, kf: Keyframe) => void;
@@ -374,6 +414,97 @@ export const useStore = create<StoreState>((set, get) => ({
     if (live) get().updateLive(apply);
     else get().update(apply);
   },
+
+  addSwatch: (swatch) =>
+    get().update((s) => {
+      s.palette.swatches.push(swatch);
+    }),
+
+  removeSwatch: (id) =>
+    get().update((s) => {
+      s.palette.swatches = s.palette.swatches.filter((x) => x.id !== id);
+    }),
+
+  updateSwatch: (id, patch, live = false) => {
+    const apply = (s: SceneDocument) => {
+      const sw = s.palette.swatches.find((x) => x.id === id);
+      if (sw) patch(sw);
+    };
+    if (live) get().updateLive(apply);
+    else get().update(apply);
+  },
+
+  /** Re-theme: replace swatch colours by position (hot-swap a whole palette). */
+  applyPaletteTheme: (swatches) =>
+    get().update((s) => {
+      s.palette.swatches.forEach((sw, i) => {
+        if (swatches[i]) sw.color = swatches[i].color;
+      });
+    }),
+
+  toggleLayerSolo: (id) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === id);
+      if (l) l.solo = !l.solo;
+    }),
+
+  toggleLayerLock: (id) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === id);
+      if (l) l.locked = !l.locked;
+    }),
+
+  setLayerLabel: (id, label) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === id);
+      if (l) l.label = label;
+    }),
+
+  alignLayers: (ids, op) =>
+    get().update((s) => {
+      const layers = s.layers.filter((l) => ids.includes(l.id));
+      const moves = computeAlign(layers, op);
+      for (const l of layers) {
+        const m = moves.get(l.id);
+        if (!m) continue;
+        if (m.x !== undefined) l.transform.x.value = m.x;
+        if (m.y !== undefined) l.transform.y.value = m.y;
+      }
+    }),
+
+  distributeLayers: (ids, op) =>
+    get().update((s) => {
+      const layers = s.layers.filter((l) => ids.includes(l.id));
+      const moves = computeDistribute(layers, op);
+      for (const l of layers) {
+        const m = moves.get(l.id);
+        if (!m) continue;
+        if (m.x !== undefined) l.transform.x.value = m.x;
+        if (m.y !== undefined) l.transform.y.value = m.y;
+      }
+    }),
+
+  alignToComp: (id, op) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === id);
+      if (!l) return;
+      const { width: W, height: H } = s.composition;
+      const sz = layerHalfExtents(l);
+      switch (op) {
+        case "left": l.transform.x.value = sz.w; break;
+        case "centerX": l.transform.x.value = W / 2; break;
+        case "right": l.transform.x.value = W - sz.w; break;
+        case "top": l.transform.y.value = sz.h; break;
+        case "centerY": l.transform.y.value = H / 2; break;
+        case "bottom": l.transform.y.value = H - sz.h; break;
+      }
+    }),
+
+  autoAnimate: (id, preset, mode) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === id);
+      if (l) applyAutoAnimate(l, preset, s.composition, { mode });
+    }),
 
   addKeyframe: (layerId, channelPath, kf) =>
     get().update((s) => {

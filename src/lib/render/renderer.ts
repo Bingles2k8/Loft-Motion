@@ -62,11 +62,12 @@ import {
   evalTransform,
   isLayerActive,
 } from "@/lib/anim/evaluate";
-import type {
-  Effect,
-  Layer,
-  SceneDocument,
-  ShapePayload,
+import {
+  resolveColor,
+  type Effect,
+  type Layer,
+  type SceneDocument,
+  type ShapePayload,
 } from "@/lib/scene/schema";
 import { evalBehaviors, type CloneContext } from "@/lib/anim/behaviors";
 import {
@@ -93,6 +94,11 @@ interface LayerNode {
 
 function hex(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16) || 0;
+}
+
+/** Resolve a colour (possibly a `@swatch` reference) to a hex string. */
+function resolved(color: string, scene: SceneDocument): string {
+  return resolveColor(color, scene.palette);
 }
 
 /** Structural signature — excludes animatable channel values so playback/drag
@@ -123,6 +129,9 @@ function signature(scene: SceneDocument): string {
         ? `${l.cloner.mode}:${l.cloner.cols}x${l.cloner.rows}:${l.cloner.count}`
         : "0",
     })),
+    // Palette swatch values are baked into shape geometry at build → a re-theme
+    // must rebuild the graph.
+    pal: scene.palette?.swatches.map((s) => `${s.id}:${s.color}`).join(","),
   });
 }
 
@@ -233,7 +242,7 @@ export class SceneRenderer {
         fontFamily: layer.text.fontFamily,
         fontSize: layer.text.fontSize,
         fontWeight: String(layer.text.fontWeight) as TextStyle["fontWeight"],
-        fill: layer.text.fill,
+        fill: resolved(layer.text.fill, this.scene),
         align: layer.text.align,
         letterSpacing: layer.text.letterSpacing,
       });
@@ -322,35 +331,36 @@ export class SceneRenderer {
         break;
     }
 
-    // Fill — solid or a best-effort linear gradient.
+    // Fill — solid or a best-effort linear gradient (swatch refs resolved).
     const fill = shape.fill;
+    const fillColor = resolved(fill.color, this.scene);
     if (fill.gradient) {
       try {
         const grad = makeGradient(
           w,
           h,
-          fill.color,
-          fill.gradient.to,
+          fillColor,
+          resolved(fill.gradient.to, this.scene),
           fill.gradient.angle,
         );
         g.fill(grad);
       } catch {
-        g.fill({ color: hex(fill.color) });
+        g.fill({ color: hex(fillColor) });
       }
     } else {
-      g.fill({ color: hex(fill.color) });
+      g.fill({ color: hex(fillColor) });
     }
 
     if (shape.stroke && shape.stroke.width > 0) {
-      g.stroke({ width: shape.stroke.width, color: hex(shape.stroke.color) });
+      g.stroke({ width: shape.stroke.width, color: hex(resolved(shape.stroke.color, this.scene)) });
     }
     return g;
   }
 
   private createFilter(effect: Effect): Filter | null {
     const p = (k: string, d = 0) => effect.params[k]?.value ?? d;
-    const c1 = hex(effect.color ?? "#ffffff");
-    const c2 = hex(effect.color2 ?? "#000000");
+    const c1 = hex(resolved(effect.color ?? "#ffffff", this.scene));
+    const c2 = hex(resolved(effect.color2 ?? "#000000", this.scene));
     try {
       switch (effect.type) {
         case "blur":
@@ -412,8 +422,8 @@ export class SceneRenderer {
           });
         case "tint":
           return new DuotoneFilter(
-            effect.color ?? "#101830",
-            effect.color2 ?? "#5ce1ff",
+            resolved(effect.color ?? "#101830", this.scene),
+            resolved(effect.color2 ?? "#5ce1ff", this.scene),
             p("amount", 100) / 100,
           );
         case "film-grade": {
@@ -490,7 +500,7 @@ export class SceneRenderer {
   /** Map a glow/bloom effect's params onto DeepGlow options for this quality. */
   private glowOptions(effect: Effect) {
     const p = (k: string, d = 0) => effect.params[k]?.value ?? d;
-    const tintHex = effect.color ?? "#ffffff";
+    const tintHex = resolved(effect.color ?? "#ffffff", this.scene);
     const n = Number.parseInt(tintHex.replace("#", ""), 16) || 0xffffff;
     const tint: [number, number, number] = [
       ((n >> 16) & 255) / 255,
@@ -538,6 +548,8 @@ export class SceneRenderer {
     const layersById = new Map(this.scene.layers.map((l) => [l.id, l]));
 
     const dur = this.scene.composition.duration;
+    // Solo: if any layer is soloed, only soloed layers render.
+    const anySolo = this.scene.layers.some((l) => l.solo);
 
     for (const layer of this.scene.layers) {
       const node = this.nodes.get(layer.id);
@@ -545,7 +557,8 @@ export class SceneRenderer {
       node.layer = layer;
 
       const tf = evalTransform(layer.transform, t);
-      const active = layer.visible && isLayerActive(layer, t);
+      const active =
+        layer.visible && isLayerActive(layer, t) && (!anySolo || layer.solo);
       const count = layer.cloner?.enabled ? cloneCount(layer.cloner) : 1;
       const stagger = layer.cloner?.enabled ? layer.cloner.stagger : 0;
 

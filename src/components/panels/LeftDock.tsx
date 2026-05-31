@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store/useStore";
 import { ProjectPanel } from "@/components/panels/ProjectPanel";
 import { EffectsPanel } from "@/components/panels/EffectsPanel";
 import { BehaviorsBrowsePanel } from "@/components/panels/BehaviorsBrowsePanel";
+import { PalettePanel } from "@/components/panels/PalettePanel";
 
 /** Tabbed left column: Project ⇄ Effects ⇄ Behaviors. */
 export function LeftDock() {
@@ -22,11 +23,15 @@ export function LeftDock() {
         <Tab active={leftTab === "behaviors"} onClick={() => setLeftTab("behaviors")}>
           Behaviors
         </Tab>
+        <Tab active={leftTab === "palette"} onClick={() => setLeftTab("palette")}>
+          Palette
+        </Tab>
       </div>
       <div className="min-h-0 flex-1">
         {leftTab === "project" && <ProjectPanel />}
         {leftTab === "effects" && <EffectsPanel />}
         {leftTab === "behaviors" && <BehaviorsBrowsePanel />}
+        {leftTab === "palette" && <PalettePanel />}
       </div>
     </div>
   );

@@ -97,6 +97,8 @@ export function createShapeLayer(
     type: "shape",
     visible: true,
     locked: false,
+    solo: false,
+    label: 0,
     blendMode: "normal",
     parentId: null,
     transform: defaultTransform(x, y),
@@ -122,6 +124,8 @@ export function createTextLayer(init: LayerInit = {}): Layer {
     type: "text",
     visible: true,
     locked: false,
+    solo: false,
+    label: 0,
     blendMode: "normal",
     parentId: null,
     transform: defaultTransform(x, y),
@@ -153,6 +157,8 @@ export function createImageLayer(
     type: "image",
     visible: true,
     locked: false,
+    solo: false,
+    label: 0,
     blendMode: "normal",
     parentId: null,
     transform: defaultTransform(x, y),
@@ -261,6 +267,7 @@ export function emptyScene(): SceneDocument {
     composition: defaultComposition(),
     layers: [],
     assets: [],
+    palette: { swatches: [] },
   };
 }
 
@@ -350,5 +357,6 @@ export function sampleScene(): SceneDocument {
     composition: comp,
     layers: [panel, ...dots, title],
     assets: [],
+    palette: { swatches: [] },
   };
 }

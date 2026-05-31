@@ -299,12 +299,27 @@ export const zCloner = z.object({
 });
 export type Cloner = z.infer<typeof zCloner>;
 
+/** Layer label colors for timeline organization (index into LABEL_COLORS). */
+export const LABEL_COLORS = [
+  "#6e6e6e", // none / grey
+  "#d96a8f", // rose
+  "#d6a14f", // amber
+  "#5cb88a", // green
+  "#58c8d6", // teal
+  "#4f8fcb", // blue
+  "#9b7cff", // violet
+] as const;
+
 export const zLayer = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(LAYER_TYPES),
   visible: z.boolean().default(true),
   locked: z.boolean().default(false),
+  /** Solo isolates this layer (and other soloed layers) in the viewport. */
+  solo: z.boolean().default(false),
+  /** Index into LABEL_COLORS (0 = none). */
+  label: z.number().int().default(0),
   blendMode: z.enum(BLEND_MODES).default("normal"),
   parentId: z.string().nullable().default(null),
   transform: zTransform,
@@ -358,6 +373,28 @@ export const zAsset = z.object({
 });
 export type Asset = z.infer<typeof zAsset>;
 
+/* -------------------------------------------------------------------------- */
+/*  Palette / shared styles (Cavalry-style hot-swap theming)                   */
+/* -------------------------------------------------------------------------- */
+
+/** A named swatch in the project palette. */
+export const zSwatch = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(), // hex
+});
+export type Swatch = z.infer<typeof zSwatch>;
+
+/**
+ * The project palette. Layer colours may reference a swatch by storing the
+ * string `@<swatchId>`; the renderer/exporters resolve it through here, so
+ * swapping a swatch re-themes every layer that references it at once.
+ */
+export const zPalette = z.object({
+  swatches: z.array(zSwatch).default([]),
+});
+export type Palette = z.infer<typeof zPalette>;
+
 export const SCENE_VERSION = 2 as const;
 
 export const zSceneDocument = z.object({
@@ -368,8 +405,46 @@ export const zSceneDocument = z.object({
   /** Render/stacking order is array order: index 0 is the bottom layer. */
   layers: z.array(zLayer).default([]),
   assets: z.array(zAsset).default([]),
+  palette: zPalette.default({ swatches: [] }),
 });
 export type SceneDocument = z.infer<typeof zSceneDocument>;
+
+/** Resolve a colour that may be a swatch reference (`@id`) to a hex string. */
+export function resolveColor(color: string, palette?: Palette): string {
+  if (!color?.startsWith("@")) return color;
+  const id = color.slice(1);
+  const sw = palette?.swatches.find((s) => s.id === id);
+  return sw?.color ?? "#ffffff";
+}
+
+/** True if a colour string is a swatch reference. */
+export function isSwatchRef(color: string): boolean {
+  return typeof color === "string" && color.startsWith("@");
+}
+
+/**
+ * Return a copy of the scene with every `@swatch` colour reference replaced by
+ * its concrete hex value. Used by exporters so the output is self-contained.
+ */
+export function flattenPalette(scene: SceneDocument): SceneDocument {
+  const pal = scene.palette;
+  if (!pal || pal.swatches.length === 0) return scene;
+  const r = (c: string | undefined) => (c == null ? c : resolveColor(c, pal));
+  const copy: SceneDocument = JSON.parse(JSON.stringify(scene));
+  for (const l of copy.layers) {
+    if (l.shape) {
+      l.shape.fill.color = r(l.shape.fill.color)!;
+      if (l.shape.fill.gradient) l.shape.fill.gradient.to = r(l.shape.fill.gradient.to)!;
+      if (l.shape.stroke) l.shape.stroke.color = r(l.shape.stroke.color)!;
+    }
+    if (l.text) l.text.fill = r(l.text.fill)!;
+    for (const e of l.effects) {
+      e.color = r(e.color);
+      e.color2 = r(e.color2);
+    }
+  }
+  return copy;
+}
 
 /** Parse + validate untrusted JSON (e.g. an imported file). Throws on failure. */
 export function parseScene(data: unknown): SceneDocument {

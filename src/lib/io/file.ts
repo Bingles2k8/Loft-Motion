@@ -62,6 +62,7 @@ export function importSceneJson(text: string): ImportResult {
     ...result.data,
     version: SCENE_VERSION,
     assets: result.data.assets ?? [],
+    palette: result.data.palette ?? { swatches: [] },
   };
   return { ok: true, scene };
 }

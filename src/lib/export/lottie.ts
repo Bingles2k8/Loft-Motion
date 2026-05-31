@@ -10,6 +10,7 @@
  */
 import { evalAnimatable, isAnimated, keyframeBezier } from "@/lib/anim/evaluate";
 import { analyzeScene } from "@/lib/capability/engine";
+import { flattenPalette } from "@/lib/scene/schema";
 import type {
   Animatable,
   Layer,
@@ -174,7 +175,8 @@ export interface LottieExport {
   warnings: string[];
 }
 
-export function exportLottie(scene: SceneDocument): LottieExport {
+export function exportLottie(rawScene: SceneDocument): LottieExport {
+  const scene = flattenPalette(rawScene);
   const fps = scene.composition.fps;
   const op = round(scene.composition.duration * fps);
   const report = analyzeScene(scene).lottie;

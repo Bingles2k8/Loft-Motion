@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useStore } from "@/lib/store/useStore";
 
 export function Section({
   title,
@@ -189,6 +190,11 @@ export function NumberInput({
   );
 }
 
+/**
+ * Colour field with optional palette-swatch binding. When the value is a
+ * `@<id>` swatch reference, the field shows the resolved colour + the swatch
+ * name and a "linked" state; a small dropdown binds/unbinds to palette swatches.
+ */
 export function ColorInput({
   value,
   onChange,
@@ -196,26 +202,89 @@ export function ColorInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const swatches = useStore((s) => s.scene.palette.swatches);
+  const [menu, setMenu] = useState(false);
+  const bound = value.startsWith("@");
+  const swatch = bound ? swatches.find((s) => s.id === value.slice(1)) : undefined;
+  const display = bound ? swatch?.color ?? "#ffffff" : value;
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="relative flex items-center gap-2">
       <label className="relative h-6 w-6 shrink-0 overflow-hidden rounded ring-1 ring-ink-600">
-        <span
-          className="absolute inset-0"
-          style={{ background: value }}
-        />
-        <input
-          type="color"
-          value={normalizeHex(value)}
-          onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 cursor-pointer opacity-0"
-        />
+        <span className="absolute inset-0" style={{ background: display }} />
+        {!bound && (
+          <input
+            type="color"
+            value={normalizeHex(display)}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 cursor-pointer opacity-0"
+          />
+        )}
       </label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
-      />
+      {bound ? (
+        <button
+          onClick={() => onChange(display)}
+          title="Unbind from swatch"
+          className="flex w-full items-center gap-1 rounded border border-brand-500/50 bg-brand-500/10 px-2 py-1 text-xs text-brand-300"
+        >
+          <IconLinkSmall />
+          {swatch?.name ?? "swatch"}
+        </button>
+      ) : (
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
+        />
+      )}
+      {swatches.length > 0 && (
+        <button
+          onClick={() => setMenu((m) => !m)}
+          title="Bind to a palette swatch"
+          className={`shrink-0 transition ${bound ? "text-brand-300" : "text-haze-500 hover:text-haze-200"}`}
+        >
+          <IconLinkSmall />
+        </button>
+      )}
+      {menu && swatches.length > 0 && (
+        <div className="absolute right-0 top-7 z-50 w-40 rounded border border-ink-600 bg-ink-800 py-1 shadow-xl">
+          {swatches.map((sw) => (
+            <button
+              key={sw.id}
+              onClick={() => {
+                onChange(`@${sw.id}`);
+                setMenu(false);
+              }}
+              className="flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] text-haze-300 hover:bg-ink-700"
+            >
+              <span className="h-3 w-3 rounded-sm ring-1 ring-black/30" style={{ background: sw.color }} />
+              {sw.name}
+            </button>
+          ))}
+          {bound && (
+            <button
+              onClick={() => {
+                onChange(display);
+                setMenu(false);
+              }}
+              className="block w-full border-t border-ink-700 px-2 py-1 text-left text-[11px] text-haze-400 hover:bg-ink-700"
+            >
+              Unbind
+            </button>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function IconLinkSmall() {
+  return (
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12h6" />
+      <path d="M10 8H7a4 4 0 0 0 0 8h3" />
+      <path d="M14 8h3a4 4 0 0 1 0 8h-3" />
+    </svg>
   );
 }
 

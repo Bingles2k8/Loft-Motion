@@ -6,7 +6,7 @@ import { evalAnimatable } from "@/lib/anim/evaluate";
 import { layerLevelFor } from "@/lib/capability/engine";
 import { getChannel, type ChannelDef } from "@/lib/scene/paths";
 import { kf as makeKf } from "@/lib/scene/factory";
-import type { Layer } from "@/lib/scene/schema";
+import { LABEL_COLORS, type Layer } from "@/lib/scene/schema";
 import { CompatBadge } from "@/components/ui/compat";
 import { Splitter } from "@/components/ui/Splitter";
 import { GraphEditor } from "@/components/timeline/GraphEditor";
@@ -318,6 +318,9 @@ function LayerLabel({ layer, expanded }: { layer: Layer; expanded: boolean }) {
   const selectLayer = useStore((s) => s.selectLayer);
   const toggleExpanded = useStore((s) => s.toggleExpanded);
   const updateLayer = useStore((s) => s.updateLayer);
+  const toggleLayerSolo = useStore((s) => s.toggleLayerSolo);
+  const toggleLayerLock = useStore((s) => s.toggleLayerLock);
+  const setLayerLabel = useStore((s) => s.setLayerLabel);
   const activeTarget = useStore((s) => s.activeTarget);
   const solo = useStore((s) => s.soloChannels[layer.id]);
   const selected = selectedLayerId === layer.id;
@@ -329,10 +332,20 @@ function LayerLabel({ layer, expanded }: { layer: Layer; expanded: boolean }) {
   return (
     <div className={selected ? "bg-brand-tint/40" : ""}>
       <div
-        className="flex items-center gap-1.5 border-b border-ink-800 px-2"
+        className="relative flex items-center gap-1.5 border-b border-ink-800 pl-2.5 pr-2"
         style={{ height: ROW_H }}
         onClick={() => selectLayer(layer.id)}
       >
+        {/* Label-colour stripe (click to cycle through label colours). */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setLayerLabel(layer.id, (layer.label + 1) % LABEL_COLORS.length);
+          }}
+          title="Label colour"
+          className="absolute left-0 top-0 h-full w-1"
+          style={{ background: LABEL_COLORS[layer.label] }}
+        />
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -355,7 +368,33 @@ function LayerLabel({ layer, expanded }: { layer: Layer; expanded: boolean }) {
         >
           {layer.visible ? <IconEye width={13} height={13} /> : <IconEyeOff width={13} height={13} />}
         </button>
-        <span className={`flex-1 truncate text-xs ${selected ? "text-haze-200" : "text-haze-300"}`}>
+        {/* Solo */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLayerSolo(layer.id);
+          }}
+          title="Solo"
+          className={`grid h-4 w-4 place-items-center rounded text-[9px] font-bold transition ${
+            layer.solo ? "bg-amber-400/20 text-amber-300" : "text-haze-600 hover:text-haze-300"
+          }`}
+        >
+          S
+        </button>
+        {/* Lock */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLayerLock(layer.id);
+          }}
+          title="Lock"
+          className={`grid h-4 w-4 place-items-center rounded text-[9px] font-bold transition ${
+            layer.locked ? "bg-brand-500/20 text-brand-300" : "text-haze-600 hover:text-haze-300"
+          }`}
+        >
+          {layer.locked ? "L" : "l"}
+        </button>
+        <span className={`flex-1 truncate text-xs ${selected ? "text-haze-200" : "text-haze-300"} ${layer.locked ? "opacity-50" : ""}`}>
           {layer.name}
         </span>
         {expanded && <SoloMenu layer={layer} />}
