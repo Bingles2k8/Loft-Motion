@@ -25,7 +25,7 @@ import {
   type SceneDocument,
   type ShapeKind,
 } from "@/lib/scene/schema";
-import { CompatStatusIcon, LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
+import { CompatFormatIcon, LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
 import {
   ColorInput,
   Label,
@@ -651,11 +651,11 @@ function CapabilitySection({
       title="Export compatibility"
       collapsible
       right={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {EXPORT_TARGETS.map((target) => {
             const lr = report[target].layers.find((l) => l.layerId === layer.id);
             return (
-              <CompatStatusIcon key={target} level={lr?.level ?? "full"} />
+              <CompatFormatIcon key={target} target={target} level={lr?.level ?? "full"} size={13} />
             );
           })}
         </div>
@@ -670,7 +670,7 @@ function CapabilitySection({
           return (
             <div key={target} className="rounded-md border border-ink-700 p-2">
               <div className="flex items-center gap-1.5">
-                <CompatStatusIcon level={lr.level} />
+                <CompatFormatIcon target={target} level={lr.level} size={14} />
                 <span className="text-xs font-semibold text-haze-200">
                   {TARGET_LABEL[target]}
                 </span>

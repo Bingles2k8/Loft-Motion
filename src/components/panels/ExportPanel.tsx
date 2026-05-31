@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store/useStore";
 import { analyzeScene } from "@/lib/capability/engine";
 import { EXPORT_TARGETS, type ExportTarget } from "@/lib/scene/schema";
-import { LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
+import { CompatFormatIcon, LEVEL_META, TARGET_LABEL } from "@/components/ui/compat";
 import { canExportMp4, exportMp4, type Mp4Progress } from "@/lib/export/mp4";
 import { exportLottie } from "@/lib/export/lottie";
 import { exportCss } from "@/lib/export/css";
@@ -92,23 +92,20 @@ export function ExportPanel() {
 
         {/* Target tabs */}
         <div className="flex gap-1 border-b border-ink-700 px-3 py-2">
-          {EXPORT_TARGETS.map((t) => {
-            const m = LEVEL_META[report[t].level];
-            return (
-              <button
-                key={t}
-                onClick={() => setActiveTarget(t)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                  t === target
-                    ? "bg-ink-700 text-white"
-                    : "text-haze-400 hover:bg-ink-800"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${m.dot}`} />
-                {TARGET_LABEL[t]}
-              </button>
-            );
-          })}
+          {EXPORT_TARGETS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTarget(t)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                t === target
+                  ? "bg-ink-700 text-white"
+                  : "text-haze-400 hover:bg-ink-800"
+              }`}
+            >
+              <CompatFormatIcon target={t} level={report[t].level} size={15} />
+              {TARGET_LABEL[t]}
+            </button>
+          ))}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import type { CompatLevel, ExportTarget } from "@/lib/scene/schema";
 
 export const LEVEL_META: Record<
@@ -41,6 +42,72 @@ export const TARGET_GLYPH: Record<ExportTarget, string> = {
   lottie: "LOT",
   css: "CSS",
 };
+
+/**
+ * Brand-style per-format icons. `currentColor` is used for strokes/fills so the
+ * parent can tint the whole icon by compatibility (emerald/amber/rose).
+ */
+function Mp4Icon({ size = 14 }: { size?: number }) {
+  // Film strip
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M7 5v14M17 5v14" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3 9h4M3 15h4M17 9h4M17 15h4" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M11 9.5l4 2.5-4 2.5z" fill="currentColor" />
+    </svg>
+  );
+}
+function LottieIcon({ size = 14 }: { size?: number }) {
+  // Bezier / animation mark: a curve with two node handles
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 18C8 18 9 6 13 6c3 0 4 6 7 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="4" cy="18" r="2.2" fill="currentColor" />
+      <circle cx="20" cy="12" r="2.2" fill="currentColor" />
+    </svg>
+  );
+}
+function CssIcon({ size = 14 }: { size?: number }) {
+  // CSS3-style shield
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 3h14l-1.3 15L12 20l-5.7-2L5 3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M16 7H9l.3 3H16l-.4 4.2L12 15l-3.6-0.8-.2-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export const TARGET_ICON: Record<ExportTarget, (p: { size?: number }) => ReactElement> = {
+  mp4: Mp4Icon,
+  lottie: LottieIcon,
+  css: CssIcon,
+};
+
+/**
+ * A per-format brand icon, tinted by compatibility level. This is the compact
+ * mark shown in the Effects panel rows (small) and the Export-compat section.
+ */
+export function CompatFormatIcon({
+  target,
+  level,
+  size = 14,
+}: {
+  target: ExportTarget;
+  level: CompatLevel;
+  size?: number;
+}) {
+  const m = LEVEL_META[level];
+  const Icon = TARGET_ICON[target];
+  return (
+    <span
+      title={`${TARGET_LABEL[target]}: ${m.label}`}
+      className={`inline-flex ${m.color}`}
+    >
+      <Icon size={size} />
+    </span>
+  );
+}
 
 /**
  * A small status icon for one compatibility level (the 3 states):

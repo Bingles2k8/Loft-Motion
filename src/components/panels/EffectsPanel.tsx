@@ -10,7 +10,7 @@ import {
 } from "@/lib/effects/catalog";
 import { createEffect } from "@/lib/scene/factory";
 import { EXPORT_TARGETS, type EffectType } from "@/lib/scene/schema";
-import { CompatTargetIcon } from "@/components/ui/compat";
+import { CompatFormatIcon } from "@/components/ui/compat";
 import { PanelHeader } from "@/components/panels/ProjectPanel";
 import { IconSearch } from "@/components/ui/icons";
 
@@ -116,9 +116,14 @@ function EffectRow({
         <div className="text-xs font-medium text-haze-200">{def.label}</div>
         <div className="truncate text-[10px] text-haze-500">{def.description}</div>
       </div>
-      <div className="mt-0.5 flex shrink-0 flex-col items-end gap-0.5">
+      <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
         {EXPORT_TARGETS.map((t) => (
-          <CompatTargetIcon key={t} target={t} level={effectCompat(def.type, t).level} />
+          <CompatFormatIcon
+            key={t}
+            target={t}
+            level={effectCompat(def.type, t).level}
+            size={13}
+          />
         ))}
       </div>
     </button>
