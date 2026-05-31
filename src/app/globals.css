@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* Loft Motion design tokens — a calm, dark studio palette. */
+@theme {
+  --color-ink-950: #08080d;
+  --color-ink-900: #0b0b12;
+  --color-ink-850: #101019;
+  --color-ink-800: #15151f;
+  --color-ink-700: #1d1d2b;
+  --color-ink-600: #2a2a3d;
+  --color-ink-500: #3a3a52;
+  --color-haze-400: #8a8aa8;
+  --color-haze-300: #a7a7c4;
+  --color-brand-500: #7c5cff;
+  --color-brand-400: #957bff;
+  --color-brand-300: #b3a1ff;
+  --color-mint-400: #5ce1ff;
+  --color-rose-400: #ff5c9d;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-900);
+  color: #e9e9f3;
+  font-family: var(--font-sans);
+  overscroll-behavior: none;
+}
+
+/* Thin, unobtrusive scrollbars to match the studio feel. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Range inputs styled as slim sliders. */
+input[type="range"].lm-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-ink-600);
+  outline: none;
+}
+input[type="range"].lm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-brand-400);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
+}
+input[type="range"].lm-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-brand-400);
+  cursor: pointer;
+}
+
+@keyframes lm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lm-spin {
+  animation: lm-spin 0.8s linear infinite;
+}

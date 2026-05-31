@@ -1,0 +1,199 @@
+"use client";
+
+import { useRef } from "react";
+import { useStore } from "@/lib/store/useStore";
+import {
+  createImageLayer,
+  createShapeLayer,
+  createTextLayer,
+} from "@/lib/scene/factory";
+import {
+  downloadSceneJson,
+  importSceneJson,
+  readFileAsText,
+  readImageFile,
+} from "@/lib/io/file";
+import {
+  IconCircle,
+  IconDownload,
+  IconImage,
+  IconLayers,
+  IconRedo,
+  IconSpark,
+  IconSquare,
+  IconStar,
+  IconText,
+  IconUndo,
+  IconUpload,
+} from "@/components/ui/icons";
+
+function ToolButton({
+  onClick,
+  title,
+  disabled,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      className="flex h-8 w-8 items-center justify-center rounded-md text-haze-300 transition hover:bg-ink-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+    >
+      {children}
+    </button>
+  );
+}
+
+export function Toolbar() {
+  const addLayer = useStore((s) => s.addLayer);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const canUndo = useStore((s) => s.past.length > 0);
+  const canRedo = useStore((s) => s.future.length > 0);
+  const loadScene = useStore((s) => s.loadScene);
+  const name = useStore((s) => s.scene.name);
+  const update = useStore((s) => s.update);
+  const setShowExport = useStore((s) => s.setShowExport);
+  const setShowPrinciples = useStore((s) => s.setShowPrinciples);
+  const showPrinciples = useStore((s) => s.showPrinciples);
+
+  const jsonInput = useRef<HTMLInputElement>(null);
+  const imgInput = useRef<HTMLInputElement>(null);
+
+  const handleImportJson = async (file: File) => {
+    const text = await readFileAsText(file);
+    const result = importSceneJson(text);
+    if (result.ok && result.scene) loadScene(result.scene);
+    else alert(result.error ?? "Import failed");
+  };
+
+  const handleImportImage = async (file: File) => {
+    const { src, width, height } = await readImageFile(file);
+    // Scale large images down to a sensible default footprint.
+    const max = 600;
+    const s = Math.min(1, max / Math.max(width, height));
+    const layer = createImageLayer(src, width * s, height * s, {
+      name: file.name.replace(/\.[^.]+$/, ""),
+    });
+    addLayer(layer);
+  };
+
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-850 px-3">
+      {/* Brand */}
+      <div className="flex items-center gap-2 pr-2">
+        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-brand-400 to-rose-400 text-white">
+          <IconLayers width={16} height={16} />
+        </div>
+        <span className="text-sm font-bold tracking-tight">Loft Motion</span>
+      </div>
+
+      <div className="mx-1 h-5 w-px bg-ink-600" />
+
+      {/* Add layers */}
+      <div className="flex items-center gap-0.5">
+        <ToolButton title="Add rectangle" onClick={() => addLayer(createShapeLayer("rect"))}>
+          <IconSquare />
+        </ToolButton>
+        <ToolButton title="Add ellipse" onClick={() => addLayer(createShapeLayer("ellipse"))}>
+          <IconCircle />
+        </ToolButton>
+        <ToolButton title="Add star" onClick={() => addLayer(createShapeLayer("star"))}>
+          <IconStar />
+        </ToolButton>
+        <ToolButton title="Add text" onClick={() => addLayer(createTextLayer())}>
+          <IconText />
+        </ToolButton>
+        <ToolButton title="Add image" onClick={() => imgInput.current?.click()}>
+          <IconImage />
+        </ToolButton>
+      </div>
+
+      <div className="mx-1 h-5 w-px bg-ink-600" />
+
+      {/* History */}
+      <ToolButton title="Undo (⌘Z)" onClick={undo} disabled={!canUndo}>
+        <IconUndo />
+      </ToolButton>
+      <ToolButton title="Redo (⌘⇧Z)" onClick={redo} disabled={!canRedo}>
+        <IconRedo />
+      </ToolButton>
+
+      {/* Project name */}
+      <div className="mx-2 flex-1">
+        <input
+          value={name}
+          onChange={(e) =>
+            update((s) => {
+              s.name = e.target.value;
+            })
+          }
+          className="w-full max-w-xs rounded-md bg-transparent px-2 py-1 text-center text-sm font-medium text-haze-300 transition hover:bg-ink-800 focus:bg-ink-800 focus:text-white focus:outline-none"
+        />
+      </div>
+
+      {/* Principles toggle */}
+      <button
+        onClick={() => setShowPrinciples(!showPrinciples)}
+        title="Motion principles"
+        className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
+          showPrinciples
+            ? "bg-brand-500/20 text-brand-300"
+            : "text-haze-300 hover:bg-ink-700 hover:text-white"
+        }`}
+      >
+        <IconSpark width={15} height={15} />
+        Craft
+      </button>
+
+      {/* JSON import/export */}
+      <ToolButton title="Import scene JSON" onClick={() => jsonInput.current?.click()}>
+        <IconUpload />
+      </ToolButton>
+      <ToolButton
+        title="Save scene JSON"
+        onClick={() => downloadSceneJson(useStore.getState().scene)}
+      >
+        <IconDownload />
+      </ToolButton>
+
+      {/* Export */}
+      <button
+        onClick={() => setShowExport(true)}
+        className="ml-1 flex h-8 items-center gap-1.5 rounded-md bg-gradient-to-r from-brand-500 to-brand-400 px-3.5 text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition hover:brightness-110"
+      >
+        Export
+      </button>
+
+      {/* Hidden file inputs */}
+      <input
+        ref={jsonInput}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleImportJson(f);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={imgInput}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleImportImage(f);
+          e.target.value = "";
+        }}
+      />
+    </header>
+  );
+}
