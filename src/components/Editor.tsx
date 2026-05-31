@@ -99,9 +99,10 @@ export function Editor() {
         </div>
         <Splitter
           orientation="vertical"
-          onResize={(d) =>
-            setPanelSize("left", clamp(sizes.left + d, 200, 480))
-          }
+          value={sizes.left}
+          min={200}
+          max={480}
+          onChange={(v) => setPanelSize("left", v)}
         />
 
         <Stage />
@@ -109,9 +110,10 @@ export function Editor() {
         <Splitter
           orientation="vertical"
           invert
-          onResize={(d) =>
-            setPanelSize("right", clamp(sizes.right + d, 240, 520))
-          }
+          value={sizes.right}
+          min={240}
+          max={520}
+          onChange={(v) => setPanelSize("right", v)}
         />
         <div className="shrink-0" style={{ width: sizes.right }}>
           <PropertiesPanel />
@@ -122,9 +124,10 @@ export function Editor() {
       <Splitter
         orientation="horizontal"
         invert
-        onResize={(d) =>
-          setPanelSize("bottom", clamp(sizes.bottom + d, 160, 640))
-        }
+        value={sizes.bottom}
+        min={160}
+        max={640}
+        onChange={(v) => setPanelSize("bottom", v)}
       />
       <div className="shrink-0" style={{ height: sizes.bottom }}>
         <Timeline />
@@ -134,8 +137,4 @@ export function Editor() {
       <PrinciplesPanel />
     </div>
   );
-}
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.max(lo, Math.min(hi, v));
 }

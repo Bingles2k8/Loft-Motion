@@ -6,7 +6,7 @@ import { keyframeBezier } from "@/lib/anim/evaluate";
 import { sampleCurve, type Bezier } from "@/lib/anim/curve";
 import { getChannel } from "@/lib/scene/paths";
 import { layerChannels, startDrag } from "@/components/timeline/shared";
-import type { Keyframe, Layer } from "@/lib/scene/schema";
+import type { Keyframe } from "@/lib/scene/schema";
 
 /**
  * The Graph Editor — AE-style value curves with draggable bezier handles.
@@ -17,14 +17,6 @@ import type { Keyframe, Layer } from "@/lib/scene/schema";
  * the segment's easing (writing a custom `bezier` onto the keyframe), which the
  * shared evaluation path and every exporter honour.
  */
-
-interface CurvePoint {
-  ref: KfRef;
-  kf: Keyframe;
-  layer: Layer;
-  channelPath: string;
-  color: string;
-}
 
 interface ChannelCurve {
   layerId: string;
@@ -43,17 +35,10 @@ const CHANNEL_COLORS = [
   "#b6b6b6",
 ];
 
-export function GraphEditor({
-  pxPerSec,
-  duration,
-  scrollLeft,
-}: {
-  pxPerSec: number;
-  duration: number;
-  scrollLeft: number;
-}) {
+export function GraphEditor({ timeToX }: { timeToX: (t: number) => number }) {
   const scene = useStore((s) => s.scene);
   const selectedLayerId = useStore((s) => s.selectedLayerId);
+  const soloChannels = useStore((s) => s.soloChannels);
   const selectedKeys = useStore((s) => s.selectedKeys);
   const selectKeyframe = useStore((s) => s.selectKeyframe);
   const updateKeyframe = useStore((s) => s.updateKeyframe);
@@ -82,7 +67,9 @@ export function GraphEditor({
       ? scene.layers.filter((l) => l.id === selectedLayerId)
       : scene.layers;
     for (const layer of layersToShow) {
+      const solo = soloChannels[layer.id];
       for (const ch of layerChannels(layer)) {
+        if (solo && solo.length > 0 && !solo.includes(ch.path)) continue;
         const channel = getChannel(layer, ch.path);
         if (channel && channel.keyframes.length > 1) {
           out.push({
@@ -97,7 +84,7 @@ export function GraphEditor({
       }
     }
     return out;
-  }, [scene, selectedLayerId]);
+  }, [scene, selectedLayerId, soloChannels]);
 
   // Auto-fit value range across all displayed curves.
   const valueRange = useMemo(() => {
@@ -125,11 +112,8 @@ export function GraphEditor({
   const padBottom = 16;
   const plotH = Math.max(40, size.h - padTop - padBottom);
 
-  const timeToX = (t: number) => t * pxPerSec - scrollLeft;
   const valueToY = (v: number) =>
     padTop + plotH - ((v - valueRange.min) / (valueRange.max - valueRange.min)) * plotH;
-
-  const contentW = duration * pxPerSec;
 
   if (curves.length === 0) {
     return (
@@ -174,35 +158,56 @@ export function GraphEditor({
           />
         ))}
 
-        {/* Keyframe points + handles */}
+        {/* Segment handles — drawn when EITHER endpoint of the segment is
+            selected, so selecting any keyframe reveals the handles touching it. */}
         {curves.map((c) =>
-          c.keyframes.map((kf, i) => {
-            const ref: KfRef = {
-              layerId: c.layerId,
-              channelPath: c.channelPath,
-              kfId: kf.id,
-            };
+          c.keyframes.slice(0, -1).map((kf, i) => {
+            const next = c.keyframes[i + 1];
+            const refA: KfRef = { layerId: c.layerId, channelPath: c.channelPath, kfId: kf.id };
+            const refB: KfRef = { layerId: c.layerId, channelPath: c.channelPath, kfId: next.id };
+            const aSel = selectedKeys.some((r) => kfKey(r) === kfKey(refA));
+            const bSel = selectedKeys.some((r) => kfKey(r) === kfKey(refB));
+            if (!aSel && !bSel) return null;
+            return (
+              <SegmentHandles
+                key={`seg_${kf.id}`}
+                kf={kf}
+                next={next}
+                color={c.color}
+                timeToX={timeToX}
+                valueToY={valueToY}
+                onHandle={(bezier, live) =>
+                  updateKeyframe(refA.layerId, refA.channelPath, refA.kfId, { bezier }, live)
+                }
+                onHandleStart={beginChange}
+              />
+            );
+          }),
+        )}
+
+        {/* Keyframe diamonds (on top of handles). */}
+        {curves.map((c) =>
+          c.keyframes.map((kf) => {
+            const ref: KfRef = { layerId: c.layerId, channelPath: c.channelPath, kfId: kf.id };
             const selected = selectedKeys.some((r) => kfKey(r) === kfKey(ref));
             const x = timeToX(kf.time);
             const y = valueToY(kf.value);
-            const next = c.keyframes[i + 1];
             return (
-              <GraphKeyframe
+              <rect
                 key={kf.id}
-                ref_={ref}
-                kf={kf}
-                next={next}
-                x={x}
-                y={y}
-                color={c.color}
-                selected={selected}
-                timeToX={timeToX}
-                valueToY={valueToY}
-                onSelect={(additive) => selectKeyframe(ref, additive)}
-                onHandle={(bezier, live) => {
-                  updateKeyframe(ref.layerId, ref.channelPath, ref.kfId, { bezier }, live);
+                x={x - 4}
+                y={y - 4}
+                width={8}
+                height={8}
+                transform={`rotate(45 ${x} ${y})`}
+                fill={selected ? c.color : "#1b1b1b"}
+                stroke={c.color}
+                strokeWidth={1.5}
+                className="cursor-pointer"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  selectKeyframe(ref, e.shiftKey);
                 }}
-                onHandleStart={beginChange}
               />
             );
           }),
@@ -223,7 +228,6 @@ export function GraphEditor({
           </span>
         ))}
       </div>
-      <div style={{ width: contentW }} />
     </div>
   );
 }
@@ -255,119 +259,84 @@ function CurvePath({
   return <path d={d} fill="none" stroke={curve.color} strokeWidth={1.5} />;
 }
 
-function GraphKeyframe({
-  ref_,
+/**
+ * The two bezier influence handles for one segment (kf → next). cp1 controls
+ * the ease-out of `kf`, cp2 the ease-in of `next`. They're expressed in the
+ * segment's normalised [0,1] space (time × progress), matching CSS cubic-bezier.
+ */
+function SegmentHandles({
   kf,
   next,
-  x,
-  y,
   color,
-  selected,
   timeToX,
   valueToY,
-  onSelect,
   onHandle,
   onHandleStart,
 }: {
-  ref_: KfRef;
   kf: Keyframe;
-  next: Keyframe | undefined;
-  x: number;
-  y: number;
+  next: Keyframe;
   color: string;
-  selected: boolean;
   timeToX: (t: number) => number;
   valueToY: (v: number) => number;
-  onSelect: (additive: boolean) => void;
   onHandle: (bezier: Bezier, live: boolean) => void;
   onHandleStart: () => void;
 }) {
   const bez = keyframeBezier(kf);
+  const segDx = next.time - kf.time;
+  const segDv = next.value - kf.value;
+  const x0 = timeToX(kf.time);
+  const v0 = valueToY(kf.value);
+  const pxPerNormX = timeToX(kf.time + segDx) - x0;
+  const pxPerNormY = valueToY(kf.value + segDv) - v0;
 
-  // The outgoing handle (controls the start of the segment to `next`).
-  // The segment easing belongs to the OUTGOING keyframe in our model, so this is
-  // where a user reshapes the curve. cp1 = (x1,y1), cp2 = (x2,y2) in normalised
-  // segment space; we expose both handles when a keyframe is selected.
-  let handles = null;
-  if (selected && next) {
-    const segDx = next.time - kf.time;
-    const segDv = next.value - kf.value;
-    const x0 = timeToX(kf.time);
-    const v0 = valueToY(kf.value);
-    const pxPerNormX = timeToX(kf.time + segDx) - x0;
-    const pxPerNormY = valueToY(kf.value + segDv) - v0;
+  const cp1x = timeToX(kf.time + bez[0] * segDx);
+  const cp1y = valueToY(kf.value + bez[1] * segDv);
+  const cp2x = timeToX(kf.time + bez[2] * segDx);
+  const cp2y = valueToY(kf.value + bez[3] * segDv);
+  const ax = timeToX(kf.time);
+  const ay = valueToY(kf.value);
+  const bx = timeToX(next.time);
+  const by = valueToY(next.value);
 
-    const cp1x = timeToX(kf.time + bez[0] * segDx);
-    const cp1y = valueToY(kf.value + bez[1] * segDv);
-    const cp2x = timeToX(kf.time + bez[2] * segDx);
-    const cp2y = valueToY(kf.value + bez[2 + 1] * segDv);
-    const nextX = timeToX(next.time);
-    const nextY = valueToY(next.value);
-
-    const dragHandle =
-      (which: "cp1" | "cp2") => (e: React.PointerEvent) => {
-        e.stopPropagation();
-        onHandleStart();
-        const svg = (e.currentTarget as Element).closest("svg")!;
-        const rect = svg.getBoundingClientRect();
-        startDrag((ev) => {
-          const sx = ev.clientX - rect.left;
-          const sy = ev.clientY - rect.top;
-          const nx = clamp01((sx - x0) / (pxPerNormX || 1));
-          const ny = (sy - v0) / (pxPerNormY || 1);
-          const b: Bezier =
-            which === "cp1"
-              ? [nx, ny, bez[2], bez[3]]
-              : [bez[0], bez[1], nx, ny];
-          onHandle(b, true);
-        });
-      };
-
-    handles = (
-      <g>
-        <line x1={x} y1={y} x2={cp1x} y2={cp1y} stroke={color} strokeWidth={1} opacity={0.5} />
-        <line x1={nextX} y1={nextY} x2={cp2x} y2={cp2y} stroke={color} strokeWidth={1} opacity={0.5} />
-        <circle
-          cx={cp1x}
-          cy={cp1y}
-          r={4}
-          fill="#1b1b1b"
-          stroke={color}
-          strokeWidth={1.5}
-          className="cursor-grab"
-          onPointerDown={dragHandle("cp1")}
-        />
-        <circle
-          cx={cp2x}
-          cy={cp2y}
-          r={4}
-          fill="#1b1b1b"
-          stroke={color}
-          strokeWidth={1.5}
-          className="cursor-grab"
-          onPointerDown={dragHandle("cp2")}
-        />
-      </g>
-    );
-  }
+  const dragHandle = (which: "cp1" | "cp2") => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    onHandleStart();
+    const svg = (e.currentTarget as Element).closest("svg")!;
+    const rect = svg.getBoundingClientRect();
+    startDrag((ev) => {
+      const sx = ev.clientX - rect.left;
+      const sy = ev.clientY - rect.top;
+      const nx = clamp01((sx - x0) / (pxPerNormX || 1));
+      const ny = (sy - v0) / (pxPerNormY || 1);
+      const b: Bezier =
+        which === "cp1" ? [nx, ny, bez[2], bez[3]] : [bez[0], bez[1], nx, ny];
+      onHandle(b, true);
+    });
+  };
 
   return (
     <g>
-      {handles}
-      <rect
-        x={x - 4}
-        y={y - 4}
-        width={8}
-        height={8}
-        transform={`rotate(45 ${x} ${y})`}
-        fill={selected ? color : "#1b1b1b"}
+      <line x1={ax} y1={ay} x2={cp1x} y2={cp1y} stroke={color} strokeWidth={1} opacity={0.5} />
+      <line x1={bx} y1={by} x2={cp2x} y2={cp2y} stroke={color} strokeWidth={1} opacity={0.5} />
+      <circle
+        cx={cp1x}
+        cy={cp1y}
+        r={4}
+        fill="#1b1b1b"
         stroke={color}
         strokeWidth={1.5}
-        className="cursor-pointer"
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          onSelect(e.shiftKey);
-        }}
+        className="cursor-grab"
+        onPointerDown={dragHandle("cp1")}
+      />
+      <circle
+        cx={cp2x}
+        cy={cp2y}
+        r={4}
+        fill="#1b1b1b"
+        stroke={color}
+        strokeWidth={1.5}
+        className="cursor-grab"
+        onPointerDown={dragHandle("cp2")}
       />
     </g>
   );

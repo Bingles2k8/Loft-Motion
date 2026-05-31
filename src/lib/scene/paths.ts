@@ -4,6 +4,7 @@
  * the timeline (keyframe lanes) and the properties panel.
  */
 import type { Animatable, Layer } from "@/lib/scene/schema";
+import { effectDef } from "@/lib/effects/catalog";
 
 export interface ChannelDef {
   path: string;
@@ -45,16 +46,18 @@ export function getChannel(layer: Layer, path: string): Animatable | null {
 export function effectChannels(layer: Layer): ChannelDef[] {
   const defs: ChannelDef[] = [];
   for (const fx of layer.effects) {
+    const def = effectDef(fx.type);
     for (const key of Object.keys(fx.params)) {
+      const pdef = def.params.find((p) => p.key === key);
       defs.push({
         path: `effects.${fx.id}.params.${key}`,
-        label: `${cap(fx.type)} · ${key}`,
+        label: `${def.label} · ${pdef?.label ?? key}`,
+        unit: pdef?.unit,
+        min: pdef?.min,
+        max: pdef?.max,
+        step: pdef?.step,
       });
     }
   }
   return defs;
-}
-
-function cap(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " ");
 }

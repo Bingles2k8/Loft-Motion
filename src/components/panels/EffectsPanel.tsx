@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store/useStore";
 import {
-  EFFECT_CATALOG,
   EFFECT_CATEGORIES,
+  EFFECT_LIST,
   effectCompat,
-  type EffectCatalogEntry,
+  type EffectDef,
 } from "@/lib/effects/catalog";
 import { createEffect } from "@/lib/scene/factory";
 import { EXPORT_TARGETS, type EffectType } from "@/lib/scene/schema";
@@ -15,10 +15,10 @@ import { PanelHeader } from "@/components/panels/ProjectPanel";
 import { IconSearch } from "@/components/ui/icons";
 
 /**
- * Effects panel — a browseable, searchable catalog. Double-click (or use the
- * add button) to apply an effect to the selected layer. Each entry shows its
- * live export-compatibility dots so the honesty layer reaches the user before
- * they even commit to an effect.
+ * Effects panel — a browseable, searchable catalog (After Effects-style),
+ * grouped by category. Double-click (or click) to apply to the selected layer.
+ * Each entry shows live per-target export-compatibility dots so the honesty
+ * layer reaches the user before they even commit to an effect.
  */
 export function EffectsPanel() {
   const selectedLayerId = useStore((s) => s.selectedLayerId);
@@ -35,7 +35,7 @@ export function EffectsPanel() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return EFFECT_CATALOG.filter(
+    return EFFECT_LIST.filter(
       (e) =>
         !q ||
         e.label.toLowerCase().includes(q) ||
@@ -46,7 +46,7 @@ export function EffectsPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <PanelHeader title="Effects" />
+      <PanelHeader title="Effects & Presets" />
 
       <div className="border-b border-ink-700 p-2">
         <div className="flex items-center gap-1.5 rounded bg-ink-900 px-2 ring-1 ring-ink-700 focus-within:ring-brand-500">
@@ -78,7 +78,7 @@ export function EffectsPanel() {
               {items.map((e) => (
                 <EffectRow
                   key={e.type}
-                  entry={e}
+                  def={e}
                   disabled={!selectedLayerId}
                   onApply={() => apply(e.type)}
                 />
@@ -97,11 +97,11 @@ export function EffectsPanel() {
 }
 
 function EffectRow({
-  entry,
+  def,
   disabled,
   onApply,
 }: {
-  entry: EffectCatalogEntry;
+  def: EffectDef;
   disabled: boolean;
   onApply: () => void;
 }) {
@@ -110,15 +110,15 @@ function EffectRow({
       onDoubleClick={onApply}
       onClick={onApply}
       disabled={disabled}
-      className="group flex w-full items-start gap-2 border-b border-ink-800 px-2.5 py-1.5 text-left transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+      className="group flex w-full items-start gap-2 border-b border-ink-800 px-2.5 py-1.5 text-left transition hover:bg-ink-800 disabled:cursor-default disabled:opacity-50"
     >
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium text-haze-200">{entry.label}</div>
-        <div className="truncate text-[10px] text-haze-500">{entry.description}</div>
+        <div className="text-xs font-medium text-haze-200">{def.label}</div>
+        <div className="truncate text-[10px] text-haze-500">{def.description}</div>
       </div>
       <div className="mt-0.5 flex shrink-0 items-center gap-1">
         {EXPORT_TARGETS.map((t) => {
-          const c = effectCompat(entry.type, t);
+          const c = effectCompat(def.type, t);
           const m = LEVEL_META[c.level];
           return (
             <span

@@ -20,6 +20,7 @@ import {
   type ShapeKind,
   type Transform,
 } from "@/lib/scene/schema";
+import { effectDef } from "@/lib/effects/catalog";
 
 /** Short unique id; crypto.randomUUID where available, else a fallback. */
 export function uid(prefix = "id"): string {
@@ -66,26 +67,12 @@ export function defaultComposition(): Composition {
 }
 
 export function createEffect(type: EffectType): Effect {
+  const def = effectDef(type);
   const params: Record<string, Animatable> = {};
-  let color: string | undefined;
-  switch (type) {
-    case "blur":
-      params.strength = anim(8);
-      break;
-    case "glow":
-      params.strength = anim(12);
-      params.innerStrength = anim(2);
-      color = "#79aede";
-      break;
-    case "drop-shadow":
-      params.distance = anim(12);
-      params.angle = anim(45);
-      params.blur = anim(8);
-      params.alpha = anim(60);
-      color = "#000000";
-      break;
-  }
-  return { id: uid("fx"), type, enabled: true, params, color };
+  for (const p of def.params) params[p.key] = anim(p.default);
+  const color = def.colors?.find((c) => c.field === "color")?.default;
+  const color2 = def.colors?.find((c) => c.field === "color2")?.default;
+  return { id: uid("fx"), type, enabled: true, params, color, color2 };
 }
 
 interface LayerInit {

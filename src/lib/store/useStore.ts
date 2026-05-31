@@ -81,6 +81,14 @@ export interface StoreState {
   // Timeline UI
   expanded: Record<string, boolean>;
   graphMode: boolean;
+  /** Per-layer channel solo: when non-empty, only these channel paths show. */
+  soloChannels: Record<string, string[]>;
+  autoKeyframe: boolean;
+
+  // Viewport (comp view transform — does not touch layer values)
+  viewZoom: number; // 0 = fit-to-window (auto)
+  viewPanX: number;
+  viewPanY: number;
 
   // Layout
   sizes: PanelSizes;
@@ -90,6 +98,7 @@ export interface StoreState {
   activeTarget: ExportTarget;
   showPrinciples: boolean;
   showExport: boolean;
+  showSettings: boolean;
 
   // Scene mutations
   update: (recipe: Recipe) => void;
@@ -147,6 +156,16 @@ export interface StoreState {
   setActiveTarget: (t: ExportTarget) => void;
   setShowPrinciples: (v: boolean) => void;
   setShowExport: (v: boolean) => void;
+  setShowSettings: (v: boolean) => void;
+
+  // Channel solo + auto-keyframe
+  toggleSoloChannel: (layerId: string, channelPath: string) => void;
+  clearSoloChannels: (layerId: string) => void;
+  setAutoKeyframe: (v: boolean) => void;
+
+  // Viewport
+  setView: (z: number, panX: number, panY: number) => void;
+  resetView: () => void;
 
   // History
   undo: () => void;
@@ -194,6 +213,12 @@ export const useStore = create<StoreState>((set, get) => ({
 
   expanded: {},
   graphMode: false,
+  soloChannels: {},
+  autoKeyframe: false,
+
+  viewZoom: 0,
+  viewPanX: 0,
+  viewPanY: 0,
 
   sizes: loadSizes(),
   leftTab: "project",
@@ -201,6 +226,7 @@ export const useStore = create<StoreState>((set, get) => ({
   activeTarget: "mp4",
   showPrinciples: false,
   showExport: false,
+  showSettings: false,
 
   update: (recipe) =>
     set((state) => {
@@ -452,6 +478,31 @@ export const useStore = create<StoreState>((set, get) => ({
   setActiveTarget: (t) => set({ activeTarget: t }),
   setShowPrinciples: (v) => set({ showPrinciples: v }),
   setShowExport: (v) => set({ showExport: v }),
+  setShowSettings: (v) => set({ showSettings: v }),
+
+  toggleSoloChannel: (layerId, channelPath) =>
+    set((s) => {
+      const cur = s.soloChannels[layerId] ?? [];
+      const next = cur.includes(channelPath)
+        ? cur.filter((p) => p !== channelPath)
+        : [...cur, channelPath];
+      const soloChannels = { ...s.soloChannels };
+      if (next.length === 0) delete soloChannels[layerId];
+      else soloChannels[layerId] = next;
+      return { soloChannels };
+    }),
+
+  clearSoloChannels: (layerId) =>
+    set((s) => {
+      const soloChannels = { ...s.soloChannels };
+      delete soloChannels[layerId];
+      return { soloChannels };
+    }),
+
+  setAutoKeyframe: (v) => set({ autoKeyframe: v }),
+
+  setView: (z, panX, panY) => set({ viewZoom: z, viewPanX: panX, viewPanY: panY }),
+  resetView: () => set({ viewZoom: 0, viewPanX: 0, viewPanY: 0 }),
 
   undo: () =>
     set((state) => {

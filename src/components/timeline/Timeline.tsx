@@ -58,6 +58,11 @@ export function Timeline() {
 
   const areaRef = useRef<HTMLDivElement>(null);
   const [areaW, setAreaW] = useState(800);
+  // Horizontal view: zoom (1 = fit-to-width) + scroll offset in px. Scroll is
+  // allowed to overshoot past the composition's start/end by OVERSCROLL px.
+  const [zoom, setZoom] = useState(1);
+  const [scrollPx, setScrollPx] = useState(0);
+  const OVERSCROLL = 300;
 
   useLayoutEffect(() => {
     const el = areaRef.current;
@@ -68,24 +73,55 @@ export function Timeline() {
     return () => ro.disconnect();
   }, []);
 
-  const pxPerSec = areaW / duration;
-  const timeToX = (t: number) => t * pxPerSec;
+  const basePxPerSec = areaW / duration;
+  const pxPerSec = basePxPerSec * zoom;
+  const contentW = duration * pxPerSec;
+  const maxScroll = Math.max(0, contentW - areaW) + OVERSCROLL;
+  const clampScroll = (s: number) => Math.max(-OVERSCROLL, Math.min(maxScroll, s));
+
+  const timeToX = (t: number) => t * pxPerSec - scrollPx;
   const xToTime = (clientX: number) => {
     const rect = areaRef.current!.getBoundingClientRect();
-    return Math.max(0, Math.min(duration, (clientX - rect.left) / pxPerSec));
+    return (clientX - rect.left + scrollPx) / pxPerSec;
   };
 
   // Ruler scrubbing (the ONLY place the playhead moves by click/drag).
-  const scrubRuler = (clientX: number) => setTime(snap(xToTime(clientX), fps));
+  const scrubRuler = (clientX: number) =>
+    setTime(snap(Math.max(0, Math.min(duration, xToTime(clientX))), fps));
   const onRulerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     scrubRuler(e.clientX);
     startDrag((ev) => scrubRuler(ev.clientX));
   };
 
+  // Wheel: horizontal scroll; Ctrl/Cmd = zoom about the cursor.
+  const onWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      const rect = areaRef.current!.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const tAtCursor = (cursorX + scrollPx) / pxPerSec;
+      const nextZoom = Math.max(0.25, Math.min(40, zoom * (e.deltaY < 0 ? 1.15 : 0.87)));
+      const nextPxPerSec = basePxPerSec * nextZoom;
+      setZoom(nextZoom);
+      setScrollPx(clampScroll(tAtCursor * nextPxPerSec - cursorX));
+    } else {
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      setScrollPx((s) => clampScroll(s + d));
+    }
+  };
+
+  const zoomBy = (factor: number) =>
+    setZoom((z) => Math.max(0.25, Math.min(40, z * factor)));
+  const zoomFit = () => {
+    setZoom(1);
+    setScrollPx(0);
+  };
+
   const step = niceStep(pxPerSec);
   const ticks: number[] = [];
-  for (let t = 0; t <= duration + 1e-6; t += step) ticks.push(t);
+  const tStart = Math.max(0, Math.floor(scrollPx / pxPerSec / step) * step);
+  const tEnd = Math.min(duration, (scrollPx + areaW) / pxPerSec);
+  for (let t = tStart; t <= tEnd + 1e-6; t += step) ticks.push(t);
 
   return (
     <div className="flex h-full flex-col bg-ink-850 lm-noselect">
@@ -120,9 +156,26 @@ export function Timeline() {
           </span>
         )}
 
+        {/* Zoom controls */}
+        <div className="mr-1 flex items-center gap-0.5">
+          <TransportButton onClick={() => zoomBy(0.8)} title="Zoom out">
+            <span className="text-sm leading-none">−</span>
+          </TransportButton>
+          <button
+            onClick={zoomFit}
+            title="Fit to width"
+            className="rounded px-1.5 py-1 text-[10px] font-medium tabular-nums text-haze-400 transition hover:bg-ink-700 hover:text-haze-200"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <TransportButton onClick={() => zoomBy(1.25)} title="Zoom in">
+            <span className="text-sm leading-none">+</span>
+          </TransportButton>
+        </div>
+
         <button
           onClick={toggleGraphMode}
-          title="Graph editor (toggle)"
+          title="Graph editor (Shift+G)"
           className={`flex h-7 items-center gap-1.5 rounded px-2 text-xs font-medium transition ${
             graphMode
               ? "bg-brand-500/20 text-brand-300"
@@ -161,19 +214,17 @@ export function Timeline() {
 
         <Splitter
           orientation="vertical"
-          onResize={(d) =>
-            setPanelSize(
-              "timelineLabels",
-              Math.max(160, Math.min(520, labelW + d)),
-            )
-          }
+          value={labelW}
+          min={160}
+          max={520}
+          onChange={(v) => setPanelSize("timelineLabels", v)}
         />
 
         {/* Right: ruler + tracks (or graph) */}
-        <div className="relative flex min-w-0 flex-1 flex-col">
+        <div className="relative flex min-w-0 flex-1 flex-col" onWheel={onWheel}>
           {/* Ruler — the only scrub surface */}
           <div
-            className="relative h-[26px] shrink-0 cursor-ew-resize border-b border-ink-700 bg-ink-800 lm-noselect"
+            className="relative h-[26px] shrink-0 cursor-ew-resize overflow-hidden border-b border-ink-700 bg-ink-800 lm-noselect"
             onPointerDown={onRulerDown}
             ref={areaRef}
           >
@@ -186,6 +237,11 @@ export function Timeline() {
                 {step < 1 ? t.toFixed(1) : t.toFixed(0)}s
               </div>
             ))}
+            {/* End-of-composition marker */}
+            <div
+              className="absolute top-0 bottom-0 w-px bg-ink-600"
+              style={{ left: timeToX(duration) }}
+            />
             {/* CTI head */}
             <div
               className="pointer-events-none absolute top-0 z-30"
@@ -197,9 +253,9 @@ export function Timeline() {
 
           {/* Content */}
           {graphMode ? (
-            <div className="relative min-h-0 flex-1">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               <PlayheadLine x={timeToX(time)} />
-              <GraphEditor pxPerSec={pxPerSec} duration={duration} scrollLeft={0} />
+              <GraphEditor timeToX={timeToX} />
             </div>
           ) : (
             <DopeSheet
@@ -209,6 +265,7 @@ export function Timeline() {
               xToTime={xToTime}
               areaRef={areaRef}
               playheadX={timeToX(time)}
+              contentW={contentW}
             />
           )}
         </div>
@@ -262,7 +319,12 @@ function LayerLabel({ layer, expanded }: { layer: Layer; expanded: boolean }) {
   const toggleExpanded = useStore((s) => s.toggleExpanded);
   const updateLayer = useStore((s) => s.updateLayer);
   const activeTarget = useStore((s) => s.activeTarget);
+  const solo = useStore((s) => s.soloChannels[layer.id]);
   const selected = selectedLayerId === layer.id;
+
+  const channels = layerChannels(layer).filter(
+    (ch) => !solo || solo.length === 0 || solo.includes(ch.path),
+  );
 
   return (
     <div className={selected ? "bg-brand-tint/40" : ""}>
@@ -296,24 +358,85 @@ function LayerLabel({ layer, expanded }: { layer: Layer; expanded: boolean }) {
         <span className={`flex-1 truncate text-xs ${selected ? "text-haze-200" : "text-haze-300"}`}>
           {layer.name}
         </span>
+        {expanded && <SoloMenu layer={layer} />}
         <CompatBadge level={layerLevelFor(layer, activeTarget)} target={activeTarget} />
       </div>
 
       {expanded &&
-        layerChannels(layer).map((ch) => (
-          <ChannelLabel key={ch.path} layer={layer} channel={ch} />
+        channels.map((ch) => (
+          <ChannelLabel key={ch.path} layer={layer} channel={ch} soloed={!!solo?.includes(ch.path)} />
         ))}
     </div>
   );
 }
 
-function ChannelLabel({ layer, channel }: { layer: Layer; channel: ChannelDef }) {
+/** A compact "show only…" menu to solo specific property rows (like AE's U/P/S/R). */
+function SoloMenu({ layer }: { layer: Layer }) {
+  const solo = useStore((s) => s.soloChannels[layer.id]);
+  const toggleSolo = useStore((s) => s.toggleSoloChannel);
+  const clearSolo = useStore((s) => s.clearSoloChannels);
+  const channels = layerChannels(layer);
+
+  return (
+    <details
+      className="relative"
+      onClick={(e) => e.stopPropagation()}
+      onToggle={(e) => e.stopPropagation()}
+    >
+      <summary
+        title="Show only specific properties"
+        className={`flex h-4 cursor-pointer list-none items-center rounded px-1 text-[9px] font-semibold uppercase tracking-wide transition ${
+          solo?.length ? "bg-brand-500/20 text-brand-300" : "text-haze-500 hover:text-haze-200"
+        }`}
+      >
+        Show
+      </summary>
+      <div className="absolute right-0 top-5 z-50 w-44 rounded border border-ink-600 bg-ink-800 py-1 shadow-xl">
+        <button
+          onClick={() => clearSolo(layer.id)}
+          className="block w-full px-2 py-1 text-left text-[11px] text-haze-300 hover:bg-ink-700"
+        >
+          All properties
+        </button>
+        <div className="my-1 border-t border-ink-700" />
+        {channels.map((ch) => (
+          <button
+            key={ch.path}
+            onClick={() => toggleSolo(layer.id, ch.path)}
+            className="flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] text-haze-300 hover:bg-ink-700"
+          >
+            <span
+              className={`inline-block h-2.5 w-2.5 rounded-sm border ${
+                solo?.includes(ch.path)
+                  ? "border-brand-400 bg-brand-500"
+                  : "border-ink-500"
+              }`}
+            />
+            {ch.label}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function ChannelLabel({
+  layer,
+  channel,
+  soloed,
+}: {
+  layer: Layer;
+  channel: ChannelDef;
+  soloed: boolean;
+}) {
   const addKeyframe = useStore((s) => s.addKeyframe);
   const ch = getChannel(layer, channel.path);
   const animated = (ch?.keyframes.length ?? 0) > 0;
   return (
     <div
-      className="flex items-center gap-1.5 border-b border-ink-800 pl-7 pr-2 text-[11px] text-haze-400"
+      className={`flex items-center gap-1.5 border-b border-ink-800 pl-7 pr-2 text-[11px] ${
+        soloed ? "bg-brand-tint/20 text-haze-300" : "text-haze-400"
+      }`}
       style={{ height: ROW_H }}
     >
       <button
@@ -341,12 +464,12 @@ function ChannelLabel({ layer, channel }: { layer: Layer; channel: ChannelDef })
 /* -------------------------------------------------------------------------- */
 
 function DopeSheet({
-  pxPerSec,
   duration,
   timeToX,
   xToTime,
   areaRef,
   playheadX,
+  contentW,
 }: {
   pxPerSec: number;
   duration: number;
@@ -354,9 +477,11 @@ function DopeSheet({
   xToTime: (clientX: number) => number;
   areaRef: React.RefObject<HTMLDivElement | null>;
   playheadX: number;
+  contentW: number;
 }) {
   const scene = useStore((s) => s.scene);
   const expanded = useStore((s) => s.expanded);
+  const soloChannels = useStore((s) => s.soloChannels);
   const selectKeyframes = useStore((s) => s.selectKeyframes);
   const clearSel = useStore((s) => s.clearKeyframeSelection);
   const tracksRef = useRef<HTMLDivElement>(null);
@@ -380,7 +505,7 @@ function DopeSheet({
         const m = { x0: ox, y0: oy, x1, y1 };
         setMarquee(m);
         // Compute which keyframes fall inside.
-        const refs = keysInRect(scene, expanded, timeToX, m);
+        const refs = keysInRect(scene, expanded, soloChannels, timeToX, m);
         selectKeyframes(refs);
       },
       () => {
@@ -393,10 +518,15 @@ function DopeSheet({
   return (
     <div
       ref={tracksRef}
-      className="relative min-h-0 flex-1 overflow-y-auto"
+      className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
       onPointerDown={onTracksDown}
     >
       <PlayheadLine x={playheadX} />
+      {/* End-of-composition shade */}
+      <div
+        className="pointer-events-none absolute top-0 bottom-0 z-0 bg-ink-950/40"
+        style={{ left: timeToX(duration), right: 0 }}
+      />
 
       {scene.layers
         .slice()
@@ -406,13 +536,13 @@ function DopeSheet({
             key={layer.id}
             layer={layer}
             expanded={!!expanded[layer.id]}
-            pxPerSec={pxPerSec}
+            solo={soloChannels[layer.id]}
             duration={duration}
             timeToX={timeToX}
             xToTime={xToTime}
-            areaRef={areaRef}
           />
         ))}
+      <div style={{ width: contentW }} />
 
       {marquee && (
         <div
@@ -432,25 +562,26 @@ function DopeSheet({
 function TrackGroup({
   layer,
   expanded,
-  pxPerSec,
+  solo,
   duration,
   timeToX,
   xToTime,
-  areaRef,
 }: {
   layer: Layer;
   expanded: boolean;
-  pxPerSec: number;
+  solo: string[] | undefined;
   duration: number;
   timeToX: (t: number) => number;
   xToTime: (clientX: number) => number;
-  areaRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const channels = layerChannels(layer).filter(
+    (ch) => !solo || solo.length === 0 || solo.includes(ch.path),
+  );
   return (
     <div>
-      <ClipBar layer={layer} pxPerSec={pxPerSec} duration={duration} xToTime={xToTime} />
+      <ClipBar layer={layer} timeToX={timeToX} duration={duration} xToTime={xToTime} />
       {expanded &&
-        layerChannels(layer).map((ch) => (
+        channels.map((ch) => (
           <KeyframeLane
             key={ch.path}
             layer={layer}
@@ -466,12 +597,12 @@ function TrackGroup({
 
 function ClipBar({
   layer,
-  pxPerSec,
+  timeToX,
   duration,
   xToTime,
 }: {
   layer: Layer;
-  pxPerSec: number;
+  timeToX: (t: number) => number;
   duration: number;
   xToTime: (clientX: number) => number;
 }) {
@@ -510,8 +641,8 @@ function ClipBar({
     });
   };
 
-  const left = layer.timing.start * pxPerSec;
-  const width = Math.max(4, (layer.timing.end - layer.timing.start) * pxPerSec);
+  const left = timeToX(layer.timing.start);
+  const width = Math.max(4, timeToX(layer.timing.end) - timeToX(layer.timing.start));
 
   return (
     <div className="relative border-b border-ink-800" style={{ height: ROW_H }}>
@@ -627,6 +758,7 @@ function snap(t: number, fps: number) {
 function keysInRect(
   scene: ReturnType<typeof useStore.getState>["scene"],
   expanded: Record<string, boolean>,
+  soloChannels: Record<string, string[]>,
   timeToX: (t: number) => number,
   m: Marquee,
 ): KfRef[] {
@@ -640,7 +772,11 @@ function keysInRect(
   for (const layer of scene.layers.slice().reverse()) {
     y += ROW_H; // clip bar row
     if (expanded[layer.id]) {
-      for (const ch of layerChannels(layer)) {
+      const solo = soloChannels[layer.id];
+      const channels = layerChannels(layer).filter(
+        (ch) => !solo || solo.length === 0 || solo.includes(ch.path),
+      );
+      for (const ch of channels) {
         const rowTop = y;
         const rowBottom = y + ROW_H;
         const channel = getChannel(layer, ch.path);

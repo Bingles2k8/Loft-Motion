@@ -90,7 +90,39 @@ export type Transform = z.infer<typeof zTransform>;
 /*  Effects                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export const EFFECT_TYPES = ["blur", "glow", "drop-shadow"] as const;
+/**
+ * Effect types map to PixiJS / pixi-filters. Stored generically: each effect
+ * carries keyed animatable scalar `params` plus an optional `color`, so adding
+ * an effect is just a catalog entry — no schema change needed.
+ */
+export const EFFECT_TYPES = [
+  // Blur & sharpen
+  "blur",
+  "motion-blur",
+  "zoom-blur",
+  "radial-blur",
+  // Glow / shadow / edges
+  "glow",
+  "bloom",
+  "drop-shadow",
+  "outline",
+  "bevel",
+  // Color
+  "adjust",
+  "hue-saturation",
+  "tint",
+  "color-overlay",
+  // Stylize / distort
+  "rgb-split",
+  "glitch",
+  "crt",
+  "old-film",
+  "pixelate",
+  "dot",
+  "vignette",
+  "bulge-pinch",
+  "twist",
+] as const;
 export type EffectType = (typeof EFFECT_TYPES)[number];
 
 export const zEffect = z.object({
@@ -99,8 +131,10 @@ export const zEffect = z.object({
   enabled: z.boolean().default(true),
   /** Animatable scalar params keyed by name, e.g. { strength, distance }. */
   params: z.record(z.string(), zAnimatable).default({}),
-  /** Static non-numeric params, e.g. a shadow colour. */
+  /** Static non-numeric params, e.g. a shadow/tint colour. */
   color: z.string().optional(),
+  /** Optional second colour (e.g. bevel shadow, gradient end, tint white). */
+  color2: z.string().optional(),
 });
 export type Effect = z.infer<typeof zEffect>;
 

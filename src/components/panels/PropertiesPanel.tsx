@@ -12,9 +12,9 @@ import {
   type ChannelDef,
 } from "@/lib/scene/paths";
 import { createEffect, kf as makeKf } from "@/lib/scene/factory";
+import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
 import {
   BLEND_MODES,
-  EFFECT_TYPES,
   EXPORT_TARGETS,
   SHAPE_KINDS,
   TEXT_ALIGN,
@@ -532,73 +532,76 @@ function EffectsSection({ layer }: { layer: Layer }) {
           onChange={(v) => v && addFx(v as EffectType)}
           options={[
             { value: "", label: "+ Add" },
-            ...EFFECT_TYPES.map((t) => ({ value: t, label: cap(t) })),
+            ...EFFECT_LIST.map((e) => ({ value: e.type, label: e.label })),
           ]}
         />
       }
     >
       {layer.effects.length === 0 && (
         <p className="text-[11px] text-haze-500">
-          No effects. Blur, glow and shadow look great in MP4 — but watch the
-          export badges; Lottie can&apos;t carry shaders.
+          No effects. Browse the Effects panel (top-left) to add some — watch the
+          export badges; most shader effects render in MP4 only.
         </p>
       )}
-      {layer.effects.map((fx) => (
-        <div key={fx.id} className="rounded-md border border-ink-700 p-2">
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-xs font-semibold text-haze-200">{cap(fx.type)}</span>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-[10px] text-haze-400">
-                <input
-                  type="checkbox"
-                  checked={fx.enabled}
-                  onChange={(e) =>
+      {layer.effects.map((fx) => {
+        const def = effectDef(fx.type);
+        const setColor = (field: "color" | "color2", v: string) =>
+          update((s) => {
+            const f = s.layers
+              .find((x) => x.id === layer.id)
+              ?.effects.find((y) => y.id === fx.id);
+            if (f) f[field] = v;
+          });
+        return (
+          <div key={fx.id} className="rounded border border-ink-700 p-2">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-haze-200">{def.label}</span>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1 text-[10px] text-haze-400">
+                  <input
+                    type="checkbox"
+                    checked={fx.enabled}
+                    onChange={(e) =>
+                      update((s) => {
+                        const f = s.layers
+                          .find((x) => x.id === layer.id)
+                          ?.effects.find((y) => y.id === fx.id);
+                        if (f) f.enabled = e.target.checked;
+                      })
+                    }
+                  />
+                  on
+                </label>
+                <button
+                  onClick={() =>
                     update((s) => {
-                      const f = s.layers
-                        .find((x) => x.id === layer.id)
-                        ?.effects.find((y) => y.id === fx.id);
-                      if (f) f.enabled = e.target.checked;
+                      const l = s.layers.find((x) => x.id === layer.id);
+                      if (l) l.effects = l.effects.filter((y) => y.id !== fx.id);
                     })
                   }
-                />
-                on
-              </label>
-              <button
-                onClick={() =>
-                  update((s) => {
-                    const l = s.layers.find((x) => x.id === layer.id);
-                    if (l) l.effects = l.effects.filter((y) => y.id !== fx.id);
-                  })
-                }
-                className="text-haze-400 transition hover:text-rose-300"
-              >
-                <IconTrash width={13} height={13} />
-              </button>
+                  className="text-haze-400 transition hover:text-rose-300"
+                >
+                  <IconTrash width={13} height={13} />
+                </button>
+              </div>
             </div>
-          </div>
-          {fx.color !== undefined && (
-            <Row>
-              <Label>Color</Label>
-              <ColorInput
-                value={fx.color}
-                onChange={(v) =>
-                  update((s) => {
-                    const f = s.layers
-                      .find((x) => x.id === layer.id)
-                      ?.effects.find((y) => y.id === fx.id);
-                    if (f) f.color = v;
-                  })
-                }
-              />
-            </Row>
-          )}
-          {effectChannels(layer)
-            .filter((c) => c.path.includes(fx.id))
-            .map((c) => (
-              <ChannelField key={c.path} layer={layer} channel={c} />
+            {def.colors?.map((cdef) => (
+              <Row key={cdef.field}>
+                <Label>{cdef.label}</Label>
+                <ColorInput
+                  value={(cdef.field === "color" ? fx.color : fx.color2) ?? cdef.default}
+                  onChange={(v) => setColor(cdef.field, v)}
+                />
+              </Row>
             ))}
-        </div>
-      ))}
+            {effectChannels(layer)
+              .filter((c) => c.path.includes(fx.id))
+              .map((c) => (
+                <ChannelField key={c.path} layer={layer} channel={c} />
+              ))}
+          </div>
+        );
+      })}
     </Section>
   );
 }

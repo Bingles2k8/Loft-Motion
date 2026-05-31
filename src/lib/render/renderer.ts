@@ -24,14 +24,39 @@ import {
   type Filter,
 } from "pixi.js";
 import * as Pixi from "pixi.js";
-import { GlowFilter, DropShadowFilter } from "pixi-filters";
+import {
+  AdjustmentFilter,
+  AdvancedBloomFilter,
+  BevelFilter,
+  BulgePinchFilter,
+  CRTFilter,
+  ColorOverlayFilter,
+  DotFilter,
+  DropShadowFilter,
+  GlitchFilter,
+  GlowFilter,
+  HslAdjustmentFilter,
+  MotionBlurFilter,
+  OldFilmFilter,
+  OutlineFilter,
+  PixelateFilter,
+  RadialBlurFilter,
+  RGBSplitFilter,
+  TwistFilter,
+  ZoomBlurFilter,
+} from "pixi-filters";
 
 // Pixi's barrel re-exports `./filters/index` twice, which makes some core filter
-// symbols (e.g. BlurFilter) ambiguous to the type-checker even though they exist
-// at runtime. Pull it off the namespace with a precise constructor type.
-const BlurFilter = (Pixi as unknown as {
-  BlurFilter: new (opts: { strength?: number }) => Filter;
-}).BlurFilter;
+// symbols (e.g. BlurFilter, ColorMatrixFilter) ambiguous to the type-checker even
+// though they exist at runtime. Pull them off the namespace with precise types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BlurFilter = (Pixi as any).BlurFilter as new (opts: {
+  strength?: number;
+}) => Filter;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ColorMatrixFilter = (Pixi as any).ColorMatrixFilter as new () => Filter & {
+  tint: (c: number, multiply?: boolean) => void;
+};
 import {
   evalEffectParams,
   evalTransform,
@@ -77,8 +102,8 @@ function signature(scene: SceneDocument): string {
         s: l.shape.stroke,
       },
       tx: l.text,
-      im: l.image?.src.slice(0, 32),
-      fx: l.effects.map((e) => ({ id: e.id, t: e.type, on: e.enabled, c: e.color })),
+      im: l.image && `${l.image.src.length}:${l.image.src.slice(0, 64)}`,
+      fx: l.effects.map((e) => ({ id: e.id, t: e.type, on: e.enabled, c: e.color, c2: e.color2 })),
     })),
   });
 }
@@ -89,6 +114,7 @@ export class SceneRenderer {
   private scene: SceneDocument;
   private sig = "";
   private ready = false;
+  private lastTime = 0;
 
   constructor(scene: SceneDocument) {
     this.scene = scene;
@@ -197,17 +223,19 @@ export class SceneRenderer {
       width = text.width;
       height = text.height;
     } else if (layer.type === "image" && layer.image) {
-      const sprite = new Sprite(Texture.WHITE);
-      sprite.width = layer.image.naturalWidth;
-      sprite.height = layer.image.naturalHeight;
-      width = layer.image.naturalWidth;
-      height = layer.image.naturalHeight;
+      const sprite = new Sprite(Texture.EMPTY);
+      const w0 = layer.image.naturalWidth;
+      const h0 = layer.image.naturalHeight;
+      width = w0;
+      height = h0;
       display = sprite;
-      // Load the real texture asynchronously, then resize the sprite.
+      // Load the real texture asynchronously, then resize + redraw the frame
+      // (otherwise the canvas keeps showing the initial empty texture).
       void this.loadImage(layer.image.src).then((tex) => {
-        if (tex) sprite.texture = tex;
-        sprite.width = layer.image!.naturalWidth;
-        sprite.height = layer.image!.naturalHeight;
+        if (!tex) return;
+        sprite.texture = tex;
+        sprite.setSize(w0, h0);
+        this.renderAt(this.lastTime);
       });
     } else {
       // group / precomp — an empty container.
@@ -278,22 +306,143 @@ export class SceneRenderer {
   }
 
   private createFilter(effect: Effect): Filter | null {
+    const p = (k: string, d = 0) => effect.params[k]?.value ?? d;
+    const c1 = hex(effect.color ?? "#ffffff");
+    const c2 = hex(effect.color2 ?? "#000000");
     try {
       switch (effect.type) {
         case "blur":
-          return new BlurFilter({ strength: effect.params.strength?.value ?? 8 });
+          return new BlurFilter({ strength: p("strength", 8) });
+        case "motion-blur": {
+          const a = (p("angle") * Math.PI) / 180;
+          const len = p("length", 30);
+          return new MotionBlurFilter({
+            velocity: { x: Math.cos(a) * len, y: Math.sin(a) * len },
+          });
+        }
+        case "zoom-blur":
+          return new ZoomBlurFilter({
+            strength: p("strength", 0.2),
+            innerRadius: p("innerRadius", 0),
+            center: { x: this.cx(), y: this.cy() },
+          });
+        case "radial-blur":
+          return new RadialBlurFilter({
+            angle: p("angle", 12),
+            center: { x: this.cx(), y: this.cy() },
+          });
         case "glow":
           return new GlowFilter({
-            color: hex(effect.color ?? "#ffffff"),
-            outerStrength: effect.params.strength?.value ?? 12,
-            innerStrength: effect.params.innerStrength?.value ?? 0,
+            color: c1,
+            outerStrength: p("strength", 12),
+            innerStrength: p("innerStrength", 0),
+            distance: p("distance", 10),
             quality: 0.3,
           });
-        case "drop-shadow":
+        case "bloom":
+          return new AdvancedBloomFilter({
+            threshold: p("threshold", 0.5),
+            bloomScale: p("bloomScale", 1.2),
+            blur: p("blur", 8),
+            quality: 4,
+          });
+        case "drop-shadow": {
+          const a = (p("angle", 45) * Math.PI) / 180;
+          const dist = p("distance", 12);
           return new DropShadowFilter({
-            color: hex(effect.color ?? "#000000"),
-            alpha: (effect.params.alpha?.value ?? 60) / 100,
-            blur: effect.params.blur?.value ?? 8,
+            color: c1,
+            offset: { x: Math.cos(a) * dist, y: Math.sin(a) * dist },
+            alpha: p("alpha", 60) / 100,
+            blur: p("blur", 8),
+          });
+        }
+        case "outline":
+          return new OutlineFilter({ thickness: p("thickness", 3), color: c1 });
+        case "bevel":
+          return new BevelFilter({
+            rotation: p("rotation", 45),
+            thickness: p("thickness", 2),
+            lightColor: c1,
+            shadowColor: c2,
+          });
+        case "adjust":
+          return new AdjustmentFilter({
+            brightness: p("brightness", 1),
+            contrast: p("contrast", 1),
+            saturation: p("saturation", 1),
+            gamma: p("gamma", 1),
+          });
+        case "hue-saturation":
+          return new HslAdjustmentFilter({
+            hue: p("hue", 0),
+            saturation: p("saturation", 0),
+            lightness: p("lightness", 0),
+            colorize: false,
+            alpha: 1,
+          });
+        case "tint": {
+          const f = new ColorMatrixFilter();
+          f.tint(c2, false); // map toward the "white-to" colour
+          (f as unknown as { alpha: number }).alpha = p("amount", 100) / 100;
+          return f;
+        }
+        case "color-overlay":
+          return new ColorOverlayFilter({ color: c1, alpha: p("alpha", 100) / 100 });
+        case "rgb-split": {
+          const amt = p("amount", 8);
+          return new RGBSplitFilter({
+            red: { x: -amt, y: 0 },
+            green: { x: 0, y: 0 },
+            blue: { x: amt, y: 0 },
+          });
+        }
+        case "glitch":
+          return new GlitchFilter({
+            slices: Math.round(p("slices", 6)),
+            offset: p("offset", 80),
+          });
+        case "crt":
+          return new CRTFilter({
+            curvature: p("curvature", 1),
+            lineWidth: p("lineWidth", 1),
+            noise: p("noise", 0.2),
+            vignetting: p("vignetting", 0.3),
+          });
+        case "old-film":
+          return new OldFilmFilter({
+            sepia: p("sepia", 0.3),
+            noise: p("noise", 0.3),
+            scratch: p("scratch", 0.5),
+            vignetting: p("vignetting", 0.3),
+          });
+        case "pixelate":
+          return new PixelateFilter(Math.max(1, p("size", 10)));
+        case "dot":
+          return new DotFilter({
+            scale: p("scale", 1),
+            angle: (p("angle", 5) * Math.PI) / 180,
+          });
+        case "vignette":
+          // No standalone vignette filter — reuse CRT's vignetting only.
+          return new CRTFilter({
+            curvature: 0,
+            lineWidth: 0,
+            lineContrast: 0,
+            noise: 0,
+            vignetting: p("amount", 0.4),
+            vignettingBlur: p("blur", 0.3),
+          });
+        case "bulge-pinch":
+          return new BulgePinchFilter({
+            strength: p("strength", 0.5),
+            radius: p("radius", 200),
+            center: { x: this.cx(), y: this.cy() },
+          });
+        case "twist":
+          return new TwistFilter({
+            angle: p("angle", 4),
+            radius: p("radius", 200),
+            offset: { x: this.cx() * this.scene.composition.width, y: this.cy() * this.scene.composition.height },
           });
         default:
           return null;
@@ -303,17 +452,36 @@ export class SceneRenderer {
     }
   }
 
+  private cx() {
+    return 0.5;
+  }
+  private cy() {
+    return 0.5;
+  }
+
   private async loadImage(src: string): Promise<Texture | null> {
+    // Decode via an HTMLImageElement — robust for data URLs across Pixi
+    // versions — then wrap it in a Texture.
     try {
-      return await Assets.load(src);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = src;
+      await img.decode();
+      return Texture.from(img);
     } catch {
-      return null;
+      // Fall back to the Assets loader.
+      try {
+        return await Assets.load(src);
+      } catch {
+        return null;
+      }
     }
   }
 
   /** Evaluate every layer at time `t` and apply to the Pixi graph, then draw. */
   renderAt(t: number) {
     if (!this.app) return;
+    this.lastTime = t;
     const layersById = new Map(this.scene.layers.map((l) => [l.id, l]));
 
     for (const layer of this.scene.layers) {
@@ -336,7 +504,7 @@ export class SceneRenderer {
         const f = node.filters.get(effect.id);
         if (!f) continue;
         const p = evalEffectParams(effect, t);
-        applyFilterParams(f, effect, p);
+        applyFilterParams(f, effect, p, t);
       }
       void layersById; // (parent-opacity folding handled by Pixi nesting)
     }
@@ -368,20 +536,112 @@ function applyFilterParams(
   f: Filter,
   effect: Effect,
   p: Record<string, number>,
+  t: number,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const af = f as any;
+  const set = (k: string, v: number | undefined) => {
+    if (v !== undefined) af[k] = v;
+  };
   switch (effect.type) {
     case "blur":
-      af.strength = p.strength ?? af.strength;
+      set("strength", p.strength);
+      break;
+    case "motion-blur": {
+      const a = ((p.angle ?? 0) * Math.PI) / 180;
+      const len = p.length ?? 0;
+      af.velocity = { x: Math.cos(a) * len, y: Math.sin(a) * len };
+      break;
+    }
+    case "zoom-blur":
+      set("strength", p.strength);
+      set("innerRadius", p.innerRadius);
+      break;
+    case "radial-blur":
+      set("angle", p.angle);
       break;
     case "glow":
-      af.outerStrength = p.strength ?? af.outerStrength;
-      af.innerStrength = p.innerStrength ?? af.innerStrength;
+      set("outerStrength", p.strength);
+      set("innerStrength", p.innerStrength);
+      set("distance", p.distance);
       break;
-    case "drop-shadow":
+    case "bloom":
+      set("threshold", p.threshold);
+      set("bloomScale", p.bloomScale);
+      set("blur", p.blur);
+      break;
+    case "drop-shadow": {
+      const a = ((p.angle ?? 45) * Math.PI) / 180;
+      const dist = p.distance ?? 12;
+      af.offset = { x: Math.cos(a) * dist, y: Math.sin(a) * dist };
       if (p.alpha !== undefined) af.alpha = p.alpha / 100;
-      if (p.blur !== undefined) af.blur = p.blur;
+      set("blur", p.blur);
+      break;
+    }
+    case "outline":
+      set("thickness", p.thickness);
+      break;
+    case "bevel":
+      set("rotation", p.rotation);
+      set("thickness", p.thickness);
+      break;
+    case "adjust":
+      set("brightness", p.brightness);
+      set("contrast", p.contrast);
+      set("saturation", p.saturation);
+      set("gamma", p.gamma);
+      break;
+    case "hue-saturation":
+      set("hue", p.hue);
+      set("saturation", p.saturation);
+      set("lightness", p.lightness);
+      break;
+    case "color-overlay":
+      if (p.alpha !== undefined) af.alpha = p.alpha / 100;
+      break;
+    case "rgb-split": {
+      const amt = p.amount ?? 8;
+      af.red = { x: -amt, y: 0 };
+      af.blue = { x: amt, y: 0 };
+      break;
+    }
+    case "glitch":
+      if (p.slices !== undefined) af.slices = Math.round(p.slices);
+      set("offset", p.offset);
+      af.seed = (t * 2) % 1; // animate the glitch a little over time
+      break;
+    case "crt":
+      set("curvature", p.curvature);
+      set("lineWidth", p.lineWidth);
+      set("noise", p.noise);
+      set("vignetting", p.vignetting);
+      af.time = t * 10;
+      break;
+    case "old-film":
+      set("sepia", p.sepia);
+      set("noise", p.noise);
+      set("scratch", p.scratch);
+      set("vignetting", p.vignetting);
+      af.seed = Math.random();
+      break;
+    case "pixelate":
+      if (p.size !== undefined) af.size = Math.max(1, p.size);
+      break;
+    case "dot":
+      set("scale", p.scale);
+      if (p.angle !== undefined) af.angle = (p.angle * Math.PI) / 180;
+      break;
+    case "vignette":
+      set("vignetting", p.amount);
+      set("vignettingBlur", p.blur);
+      break;
+    case "bulge-pinch":
+      set("strength", p.strength);
+      set("radius", p.radius);
+      break;
+    case "twist":
+      set("angle", p.angle);
+      set("radius", p.radius);
       break;
   }
 }

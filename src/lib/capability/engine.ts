@@ -12,20 +12,23 @@ import {
   type Layer,
   type SceneDocument,
 } from "@/lib/scene/schema";
-import {
-  FEATURE_MATRIX,
-  lookup,
-  worse,
-  type FeatureKey,
-} from "@/lib/capability/matrix";
+import { lookup, worse, type FeatureKey } from "@/lib/capability/matrix";
+import { effectCompat, effectDef } from "@/lib/effects/catalog";
 
 export interface Finding {
-  /** Which feature triggered this (matrix key). */
-  feature: FeatureKey;
+  /** Stable identifier for the feature that triggered this. */
+  feature: string;
   level: CompatLevel;
   /** Short human label, e.g. "Glow", "Gradient fill", "Multiply blend". */
   label: string;
   note?: string;
+}
+
+/** A feature a layer exercises, with a per-target compat resolver. */
+interface FeatureUse {
+  feature: string;
+  label: string;
+  compatFor: (target: ExportTarget) => { level: CompatLevel; note?: string };
 }
 
 export interface LayerReport {
@@ -47,41 +50,39 @@ export interface TargetReport {
 
 export type CapabilityReport = Record<ExportTarget, TargetReport>;
 
-/** Collect the (feature, label) pairs a single layer exercises. */
-function layerFeatures(layer: Layer): Array<{ feature: FeatureKey; label: string }> {
-  const feats: Array<{ feature: FeatureKey; label: string }> = [
-    { feature: "transform", label: "Transform" },
-  ];
+/** A feature whose compat comes from the static matrix. */
+function matrixFeature(feature: FeatureKey, label: string): FeatureUse {
+  return { feature, label, compatFor: (target) => lookup(feature, target) };
+}
+
+/** Collect the features (with per-target compat) a single layer exercises. */
+function layerFeatures(layer: Layer): FeatureUse[] {
+  const feats: FeatureUse[] = [matrixFeature("transform", "Transform")];
 
   if (layer.type === "shape" && layer.shape) {
-    feats.push({ feature: "shape", label: "Shape" });
+    feats.push(matrixFeature("shape", "Shape"));
     if (layer.shape.fill.gradient) {
-      feats.push({ feature: "gradientFill", label: "Gradient fill" });
+      feats.push(matrixFeature("gradientFill", "Gradient fill"));
     }
     if (layer.shape.stroke) {
-      feats.push({ feature: "stroke", label: "Stroke" });
+      feats.push(matrixFeature("stroke", "Stroke"));
     }
   }
-  if (layer.type === "text") {
-    feats.push({ feature: "text", label: "Text" });
-  }
-  if (layer.type === "image") {
-    feats.push({ feature: "image", label: "Image" });
-  }
+  if (layer.type === "text") feats.push(matrixFeature("text", "Text"));
+  if (layer.type === "image") feats.push(matrixFeature("image", "Image"));
 
   if (layer.blendMode !== "normal") {
-    feats.push({
-      feature: "blendMode",
-      label: `${cap(layer.blendMode)} blend`,
-    });
+    feats.push(matrixFeature("blendMode", `${cap(layer.blendMode)} blend`));
   }
 
+  // Effects resolve their compat from the effects catalog (single source).
   for (const effect of layer.effects) {
     if (!effect.enabled) continue;
-    const key = `effect.${effect.type}` as FeatureKey;
-    if (FEATURE_MATRIX[key]) {
-      feats.push({ feature: key, label: cap(effect.type) });
-    }
+    feats.push({
+      feature: `effect.${effect.type}`,
+      label: effectDef(effect.type).label,
+      compatFor: (target) => effectCompat(effect.type, target),
+    });
   }
 
   return feats;
@@ -104,8 +105,8 @@ export function analyzeScene(scene: SceneDocument): CapabilityReport {
       const findings: Finding[] = [];
       let layerLevel: CompatLevel = "full";
 
-      for (const { feature, label } of layerFeatures(layer)) {
-        const compat = lookup(feature, target);
+      for (const { feature, label, compatFor } of layerFeatures(layer)) {
+        const compat = compatFor(target);
         const finding: Finding = {
           feature,
           label,
@@ -145,8 +146,8 @@ export function layerLevelFor(
   target: ExportTarget,
 ): CompatLevel {
   let level: CompatLevel = "full";
-  for (const { feature } of layerFeatures(layer)) {
-    level = worse(level, lookup(feature, target).level);
+  for (const { compatFor } of layerFeatures(layer)) {
+    level = worse(level, compatFor(target).level);
   }
   return level;
 }
