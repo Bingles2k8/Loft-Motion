@@ -108,29 +108,40 @@ export const EFFECTS: Record<EffectType, EffectDef> = {
   },
 
   /* ---------------- Glow / Shadow / Edges ---------------- */
+  // Both glow & bloom run the linear-light HDR DeepGlow engine; they differ only
+  // in default tuning (Neon = tight + tinted, Optical = soft cinematic).
   glow: {
     type: "glow",
-    label: "Glow",
+    label: "Glow (Neon)",
     category: "Stylize",
-    description: "Neon edge glow.",
+    description: "Punchy, saturated HDR glow for titles, UI and neon looks.",
     params: [
-      { key: "strength", label: "Outer", default: 12, min: 0, max: 50 },
-      { key: "innerStrength", label: "Inner", default: 2, min: 0, max: 50 },
-      { key: "distance", label: "Distance", default: 10, min: 1, max: 50 },
+      { key: "intensity", label: "Intensity", default: 1.4, min: 0, max: 4, step: 0.05 },
+      { key: "threshold", label: "Threshold", default: 0.35, min: 0, max: 1, step: 0.01 },
+      { key: "knee", label: "Softness", default: 0.3, min: 0, max: 1, step: 0.01 },
+      { key: "radius", label: "Radius", default: 1, min: 0.1, max: 6, step: 0.1 },
+      { key: "exposure", label: "Exposure", default: 1.8, min: 0.5, max: 5, step: 0.1 },
+      { key: "chroma", label: "Chromatic", default: 0, min: 0, max: 2, step: 0.05 },
+      { key: "anamorphic", label: "Streak", default: 0, min: 0, max: 1, step: 0.05 },
     ],
-    colors: [{ field: "color", label: "Colour", default: "#79aede" }],
+    colors: [{ field: "color", label: "Tint", default: "#ffffff" }],
     compat: shaderCompat(),
   },
   bloom: {
     type: "bloom",
-    label: "Optical Glow",
+    label: "Optical Glow (Deep)",
     category: "Stylize",
-    description: "Threshold bloom on bright areas — a 'Deep Glow' look.",
+    description: "Soft, wide, cinematic HDR bloom — the Deep-Glow look.",
     params: [
-      { key: "threshold", label: "Threshold", default: 0.5, min: 0, max: 1, step: 0.01 },
-      { key: "bloomScale", label: "Intensity", default: 1.2, min: 0, max: 3, step: 0.05 },
-      { key: "blur", label: "Radius", default: 8, min: 0, max: 40 },
+      { key: "intensity", label: "Intensity", default: 1.1, min: 0, max: 4, step: 0.05 },
+      { key: "threshold", label: "Threshold", default: 0.55, min: 0, max: 1, step: 0.01 },
+      { key: "knee", label: "Softness", default: 0.5, min: 0, max: 1, step: 0.01 },
+      { key: "radius", label: "Radius", default: 2.2, min: 0.1, max: 6, step: 0.1 },
+      { key: "exposure", label: "Exposure", default: 1.5, min: 0.5, max: 5, step: 0.1 },
+      { key: "chroma", label: "Chromatic", default: 0.15, min: 0, max: 2, step: 0.05 },
+      { key: "anamorphic", label: "Streak", default: 0, min: 0, max: 1, step: 0.05 },
     ],
+    colors: [{ field: "color", label: "Tint", default: "#ffffff" }],
     compat: shaderCompat(),
   },
   "drop-shadow": {

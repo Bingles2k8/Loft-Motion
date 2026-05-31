@@ -60,7 +60,7 @@ export async function exportMp4(
   onProgress?.({ phase: "preparing", frame: 0, total });
 
   const canvas = new OffscreenCanvas(width, height);
-  const renderer = new SceneRenderer(scene);
+  const renderer = new SceneRenderer(scene, "high");
   await renderer.init(canvas);
 
   const source = new CanvasSource(canvas, {

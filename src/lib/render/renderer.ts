@@ -26,7 +26,6 @@ import {
 import * as Pixi from "pixi.js";
 import {
   AdjustmentFilter,
-  AdvancedBloomFilter,
   BevelFilter,
   BulgePinchFilter,
   CRTFilter,
@@ -34,7 +33,6 @@ import {
   DotFilter,
   DropShadowFilter,
   GlitchFilter,
-  GlowFilter,
   HslAdjustmentFilter,
   MotionBlurFilter,
   OldFilmFilter,
@@ -45,6 +43,7 @@ import {
   TwistFilter,
   ZoomBlurFilter,
 } from "pixi-filters";
+import { DeepGlowFilter } from "@/lib/render/filters/DeepGlowFilter";
 
 // Pixi's barrel re-exports `./filters/index` twice, which makes some core filter
 // symbols (e.g. BlurFilter, ColorMatrixFilter) ambiguous to the type-checker even
@@ -115,9 +114,12 @@ export class SceneRenderer {
   private sig = "";
   private ready = false;
   private lastTime = 0;
+  /** "preview" trades bloom passes for editor smoothness; "high" is full-fat. */
+  private quality: "preview" | "high";
 
-  constructor(scene: SceneDocument) {
+  constructor(scene: SceneDocument, quality: "preview" | "high" = "preview") {
     this.scene = scene;
+    this.quality = quality;
   }
 
   async init(canvas: HTMLCanvasElement | OffscreenCanvas): Promise<void> {
@@ -332,20 +334,8 @@ export class SceneRenderer {
             center: { x: this.cx(), y: this.cy() },
           });
         case "glow":
-          return new GlowFilter({
-            color: c1,
-            outerStrength: p("strength", 12),
-            innerStrength: p("innerStrength", 0),
-            distance: p("distance", 10),
-            quality: 0.3,
-          });
         case "bloom":
-          return new AdvancedBloomFilter({
-            threshold: p("threshold", 0.5),
-            bloomScale: p("bloomScale", 1.2),
-            blur: p("blur", 8),
-            quality: 4,
-          });
+          return new DeepGlowFilter(this.glowOptions(effect));
         case "drop-shadow": {
           const a = (p("angle", 45) * Math.PI) / 180;
           const dist = p("distance", 12);
@@ -459,6 +449,31 @@ export class SceneRenderer {
     return 0.5;
   }
 
+  /** Map a glow/bloom effect's params onto DeepGlow options for this quality. */
+  private glowOptions(effect: Effect) {
+    const p = (k: string, d = 0) => effect.params[k]?.value ?? d;
+    const tintHex = effect.color ?? "#ffffff";
+    const n = Number.parseInt(tintHex.replace("#", ""), 16) || 0xffffff;
+    const tint: [number, number, number] = [
+      ((n >> 16) & 255) / 255,
+      ((n >> 8) & 255) / 255,
+      (n & 255) / 255,
+    ];
+    return {
+      intensity: p("intensity", 1.2),
+      threshold: p("threshold", 0.5),
+      knee: p("knee", 0.4),
+      radius: p("radius", 1.5),
+      exposure: p("exposure", 1.6),
+      chroma: p("chroma", 0),
+      anamorphic: p("anamorphic", 0),
+      tint,
+      tonemap: 1 as const,
+      mix: 1,
+      quality: this.quality,
+    };
+  }
+
   private async loadImage(src: string): Promise<Texture | null> {
     // Decode via an HTMLImageElement — robust for data URLs across Pixi
     // versions — then wrap it in a Texture.
@@ -561,15 +576,20 @@ function applyFilterParams(
       set("angle", p.angle);
       break;
     case "glow":
-      set("outerStrength", p.strength);
-      set("innerStrength", p.innerStrength);
-      set("distance", p.distance);
+    case "bloom": {
+      // DeepGlowFilter — update its options object live.
+      const o = af.options;
+      if (o) {
+        if (p.intensity !== undefined) o.intensity = p.intensity;
+        if (p.threshold !== undefined) o.threshold = p.threshold;
+        if (p.knee !== undefined) o.knee = p.knee;
+        if (p.radius !== undefined) o.radius = p.radius;
+        if (p.exposure !== undefined) o.exposure = p.exposure;
+        if (p.chroma !== undefined) o.chroma = p.chroma;
+        if (p.anamorphic !== undefined) o.anamorphic = p.anamorphic;
+      }
       break;
-    case "bloom":
-      set("threshold", p.threshold);
-      set("bloomScale", p.bloomScale);
-      set("blur", p.blur);
-      break;
+    }
     case "drop-shadow": {
       const a = ((p.angle ?? 45) * Math.PI) / 180;
       const dist = p.distance ?? 12;
