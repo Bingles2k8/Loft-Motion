@@ -35,7 +35,15 @@ const CHANNEL_COLORS = [
   "#b6b6b6",
 ];
 
-export function GraphEditor({ timeToX }: { timeToX: (t: number) => number }) {
+export function GraphEditor({
+  timeToX,
+  xToTime,
+  duration,
+}: {
+  timeToX: (t: number) => number;
+  xToTime: (clientX: number) => number;
+  duration: number;
+}) {
   const scene = useStore((s) => s.scene);
   const selectedLayerId = useStore((s) => s.selectedLayerId);
   const soloChannels = useStore((s) => s.soloChannels);
@@ -114,6 +122,8 @@ export function GraphEditor({ timeToX }: { timeToX: (t: number) => number }) {
 
   const valueToY = (v: number) =>
     padTop + plotH - ((v - valueRange.min) / (valueRange.max - valueRange.min)) * plotH;
+  const yToValue = (y: number) =>
+    valueRange.min + ((padTop + plotH - y) / plotH) * (valueRange.max - valueRange.min);
 
   if (curves.length === 0) {
     return (
@@ -185,13 +195,36 @@ export function GraphEditor({ timeToX }: { timeToX: (t: number) => number }) {
           }),
         )}
 
-        {/* Keyframe diamonds (on top of handles). */}
+        {/* Keyframe diamonds (on top of handles). Drag to move in time + value;
+            Shift constrains to value-only (vertical). */}
         {curves.map((c) =>
           c.keyframes.map((kf) => {
             const ref: KfRef = { layerId: c.layerId, channelPath: c.channelPath, kfId: kf.id };
             const selected = selectedKeys.some((r) => kfKey(r) === kfKey(ref));
             const x = timeToX(kf.time);
             const y = valueToY(kf.value);
+            const onDown = (e: React.PointerEvent) => {
+              e.stopPropagation();
+              if (!useStore.getState().isKeyframeSelected(ref)) {
+                selectKeyframe(ref, e.shiftKey);
+              }
+              const constrain = e.shiftKey;
+              beginChange();
+              const svg = (e.currentTarget as Element).closest("svg")!;
+              const rect = svg.getBoundingClientRect();
+              let moved = false;
+              startDrag((ev) => {
+                moved = true;
+                const patch: { time?: number; value?: number } = {
+                  value: yToValue(ev.clientY - rect.top),
+                };
+                if (!constrain) {
+                  patch.time = Math.max(0, Math.min(duration, xToTime(ev.clientX)));
+                }
+                updateKeyframe(ref.layerId, ref.channelPath, ref.kfId, patch, true);
+              });
+              void moved;
+            };
             return (
               <rect
                 key={kf.id}
@@ -203,11 +236,8 @@ export function GraphEditor({ timeToX }: { timeToX: (t: number) => number }) {
                 fill={selected ? c.color : "#1b1b1b"}
                 stroke={c.color}
                 strokeWidth={1.5}
-                className="cursor-pointer"
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  selectKeyframe(ref, e.shiftKey);
-                }}
+                className="cursor-move"
+                onPointerDown={onDown}
               />
             );
           }),

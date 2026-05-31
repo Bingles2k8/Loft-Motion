@@ -255,7 +255,7 @@ export function Timeline() {
           {graphMode ? (
             <div className="relative min-h-0 flex-1 overflow-hidden">
               <PlayheadLine x={timeToX(time)} />
-              <GraphEditor timeToX={timeToX} />
+              <GraphEditor timeToX={timeToX} xToTime={xToTime} duration={duration} />
             </div>
           ) : (
             <DopeSheet
