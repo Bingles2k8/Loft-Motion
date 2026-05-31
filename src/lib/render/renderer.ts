@@ -39,11 +39,16 @@ import {
   OutlineFilter,
   PixelateFilter,
   RadialBlurFilter,
-  RGBSplitFilter,
   TwistFilter,
   ZoomBlurFilter,
 } from "pixi-filters";
 import { DeepGlowFilter } from "@/lib/render/filters/DeepGlowFilter";
+import {
+  ChromaticAberrationFilter,
+  DuotoneFilter,
+  FilmGradeFilter,
+  VignetteFilter,
+} from "@/lib/render/filters/CustomFilters";
 
 // Pixi's barrel re-exports `./filters/index` twice, which makes some core filter
 // symbols (e.g. BlurFilter, ColorMatrixFilter) ambiguous to the type-checker even
@@ -52,10 +57,6 @@ import { DeepGlowFilter } from "@/lib/render/filters/DeepGlowFilter";
 const BlurFilter = (Pixi as any).BlurFilter as new (opts: {
   strength?: number;
 }) => Filter;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ColorMatrixFilter = (Pixi as any).ColorMatrixFilter as new () => Filter & {
-  tint: (c: number, multiply?: boolean) => void;
-};
 import {
   evalEffectParams,
   evalTransform,
@@ -370,22 +371,24 @@ export class SceneRenderer {
             colorize: false,
             alpha: 1,
           });
-        case "tint": {
-          const f = new ColorMatrixFilter();
-          f.tint(c2, false); // map toward the "white-to" colour
-          (f as unknown as { alpha: number }).alpha = p("amount", 100) / 100;
+        case "tint":
+          return new DuotoneFilter(
+            effect.color ?? "#101830",
+            effect.color2 ?? "#5ce1ff",
+            p("amount", 100) / 100,
+          );
+        case "film-grade": {
+          const f = new FilmGradeFilter();
+          f.u.uExposure = p("exposure", 1);
+          f.u.uContrast = p("contrast", 1.1);
+          f.u.uSaturation = p("saturation", 1.1);
+          f.u.uTemperature = p("temperature", 0);
           return f;
         }
         case "color-overlay":
           return new ColorOverlayFilter({ color: c1, alpha: p("alpha", 100) / 100 });
-        case "rgb-split": {
-          const amt = p("amount", 8);
-          return new RGBSplitFilter({
-            red: { x: -amt, y: 0 },
-            green: { x: 0, y: 0 },
-            blue: { x: amt, y: 0 },
-          });
-        }
+        case "rgb-split":
+          return new ChromaticAberrationFilter(p("amount", 8), p("edge", 1));
         case "glitch":
           return new GlitchFilter({
             slices: Math.round(p("slices", 6)),
@@ -413,15 +416,11 @@ export class SceneRenderer {
             angle: (p("angle", 5) * Math.PI) / 180,
           });
         case "vignette":
-          // No standalone vignette filter — reuse CRT's vignetting only.
-          return new CRTFilter({
-            curvature: 0,
-            lineWidth: 0,
-            lineContrast: 0,
-            noise: 0,
-            vignetting: p("amount", 0.4),
-            vignettingBlur: p("blur", 0.3),
-          });
+          return new VignetteFilter(
+            p("amount", 0.55),
+            p("size", 0.7),
+            p("softness", 0.4),
+          );
         case "bulge-pinch":
           return new BulgePinchFilter({
             strength: p("strength", 0.5),
@@ -616,15 +615,33 @@ function applyFilterParams(
       set("saturation", p.saturation);
       set("lightness", p.lightness);
       break;
+    case "tint":
+      if (af.u && p.amount !== undefined) af.u.uAmount = p.amount / 100;
+      break;
+    case "film-grade":
+      if (af.u) {
+        if (p.exposure !== undefined) af.u.uExposure = p.exposure;
+        if (p.contrast !== undefined) af.u.uContrast = p.contrast;
+        if (p.saturation !== undefined) af.u.uSaturation = p.saturation;
+        if (p.temperature !== undefined) af.u.uTemperature = p.temperature;
+      }
+      break;
     case "color-overlay":
       if (p.alpha !== undefined) af.alpha = p.alpha / 100;
       break;
-    case "rgb-split": {
-      const amt = p.amount ?? 8;
-      af.red = { x: -amt, y: 0 };
-      af.blue = { x: amt, y: 0 };
+    case "rgb-split":
+      if (af.u) {
+        if (p.amount !== undefined) af.u.uAmount = p.amount / 20;
+        if (p.edge !== undefined) af.u.uEdge = p.edge;
+      }
       break;
-    }
+    case "vignette":
+      if (af.u) {
+        if (p.amount !== undefined) af.u.uAmount = p.amount;
+        if (p.size !== undefined) af.u.uSize = p.size;
+        if (p.softness !== undefined) af.u.uSoftness = p.softness;
+      }
+      break;
     case "glitch":
       if (p.slices !== undefined) af.slices = Math.round(p.slices);
       set("offset", p.offset);
@@ -650,10 +667,6 @@ function applyFilterParams(
     case "dot":
       set("scale", p.scale);
       if (p.angle !== undefined) af.angle = (p.angle * Math.PI) / 180;
-      break;
-    case "vignette":
-      set("vignetting", p.amount);
-      set("vignettingBlur", p.blur);
       break;
     case "bulge-pinch":
       set("strength", p.strength);

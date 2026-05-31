@@ -112,6 +112,7 @@ export const EFFECT_TYPES = [
   "hue-saturation",
   "tint",
   "color-overlay",
+  "film-grade",
   // Stylize / distort
   "rgb-split",
   "glitch",
