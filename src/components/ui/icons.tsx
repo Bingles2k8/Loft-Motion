@@ -183,6 +183,11 @@ export const IconMusic = (p: P) => (
     <circle cx="16" cy="16" r="3" fill="currentColor" stroke="none" />
   </svg>
 );
+export const IconMenu = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 6h18M3 12h18M3 18h18" />
+  </svg>
+);
 export const IconStopwatch = (p: P) => (
   <svg {...base(p)}>
     <circle cx="12" cy="13" r="8" />

@@ -11,6 +11,7 @@ import {
   createAsset,
   createImageLayerFromAsset,
 } from "@/lib/scene/factory";
+import { ViewportOverlay, type ViewTransform } from "@/components/ViewportOverlay";
 
 /**
  * The canvas surface. Owns a single SceneRenderer instance and drives it from
@@ -22,9 +23,12 @@ import {
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<SceneRenderer | null>(null);
   const [ready, setReady] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  /** comp→screen transform: screen = comp*scale + offset (offset relative to wrap). */
+  const [view, setView] = useState<ViewTransform>({ scale: 1, offsetX: 0, offsetY: 0 });
 
   const scene = useStore((s) => s.scene);
   const time = useStore((s) => s.time);
@@ -100,7 +104,7 @@ export function Stage() {
     rendererRef.current.renderAt(time);
   }, [time, ready]);
 
-  // Fit-to-viewport scaling.
+  // Fit-to-viewport scaling. Records the comp→screen transform for the overlay.
   useEffect(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
@@ -110,8 +114,15 @@ export function Stage() {
       const cw = wrap.clientWidth - pad;
       const ch = wrap.clientHeight - pad;
       const scale = Math.min(cw / compW, ch / compH, 1);
-      canvas.style.width = `${Math.round(compW * scale)}px`;
-      canvas.style.height = `${Math.round(compH * scale)}px`;
+      const dispW = Math.round(compW * scale);
+      const dispH = Math.round(compH * scale);
+      canvas.style.width = `${dispW}px`;
+      canvas.style.height = `${dispH}px`;
+      setView({
+        scale,
+        offsetX: (wrap.clientWidth - dispW) / 2,
+        offsetY: (wrap.clientHeight - dispH) / 2,
+      });
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -131,14 +142,13 @@ export function Stage() {
       onDrop={handleDrop}
     >
       <div
+        ref={boxRef}
         className="shadow-2xl shadow-black/50 ring-1 ring-black/40"
         style={{ background: compBg }}
       >
         <canvas ref={canvasRef} className="block" />
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-4 text-[11px] font-medium text-haze-500">
-        {compW} × {compH} · {scene.composition.fps}fps · {scene.composition.duration}s
-      </div>
+      {ready && <ViewportOverlay view={view} wrapRef={wrapRef} />}
       {dragOver && (
         <div className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded border-2 border-dashed border-brand-400/70 bg-brand-500/10">
           <span className="text-sm font-semibold text-brand-300">

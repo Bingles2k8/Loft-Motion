@@ -655,71 +655,49 @@ function CapabilitySection({
 
 function CompositionProperties() {
   const scene = useStore((s) => s.scene);
-  const update = useStore((s) => s.update);
-  const updateLive = useStore((s) => s.updateLive);
-  const beginChange = useStore((s) => s.beginChange);
+  const setShowSettings = useStore((s) => s.setShowSettings);
   const c = scene.composition;
 
-  const setC = (patch: (comp: typeof c) => void, live = false) =>
-    (live ? updateLive : update)((s) => patch(s.composition));
-
   return (
-    <>
+    <div className="flex h-full flex-col">
       <Section title="Composition">
-        <Row>
-          <Label>Width</Label>
-          <NumberInput
-            value={c.width}
-            min={1}
-            suffix="px"
-            onCommitStart={beginChange}
-            onChange={(v, live) => setC((x) => (x.width = Math.round(v)), live)}
-          />
-        </Row>
-        <Row>
-          <Label>Height</Label>
-          <NumberInput
-            value={c.height}
-            min={1}
-            suffix="px"
-            onCommitStart={beginChange}
-            onChange={(v, live) => setC((x) => (x.height = Math.round(v)), live)}
-          />
-        </Row>
-        <Row>
-          <Label>FPS</Label>
-          <NumberInput
-            value={c.fps}
-            min={1}
-            max={120}
-            onCommitStart={beginChange}
-            onChange={(v, live) => setC((x) => (x.fps = Math.round(v)), live)}
-          />
-        </Row>
-        <Row>
-          <Label>Duration</Label>
-          <NumberInput
-            value={c.duration}
-            min={0.1}
-            step={0.5}
-            suffix="s"
-            onCommitStart={beginChange}
-            onChange={(v, live) => setC((x) => (x.duration = v), live)}
-          />
-        </Row>
-        <Row>
-          <Label>Background</Label>
-          <ColorInput
-            value={c.background}
-            onChange={(v) => setC((x) => (x.background = v))}
-          />
-        </Row>
+        <div className="space-y-1 text-[11px] text-haze-400">
+          <InfoRow label="Size" value={`${c.width} × ${c.height}`} />
+          <InfoRow label="Frame rate" value={`${c.fps} fps`} />
+          <InfoRow label="Duration" value={`${c.duration}s`} />
+          <div className="flex items-center justify-between">
+            <span>Background</span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-3 w-3 rounded-sm ring-1 ring-ink-600"
+                style={{ background: c.background }}
+              />
+              {c.background}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="mt-2 w-full rounded bg-ink-700 py-1.5 text-[11px] font-medium text-haze-200 transition hover:bg-ink-600"
+        >
+          Edit scene settings…
+        </button>
       </Section>
       <div className="px-3 py-4 text-[11px] leading-relaxed text-haze-500">
         Select a layer to edit it, or add one from the toolbar. Tip: press{" "}
-        <kbd className="rounded bg-ink-700 px-1">Space</kbd> to play.
+        <kbd className="rounded bg-ink-700 px-1">Space</kbd> to play, and drag a
+        layer in the viewport to move, scale or rotate it.
       </div>
-    </>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span>{label}</span>
+      <span className="text-haze-300 tabular-nums">{value}</span>
+    </div>
   );
 }
 

@@ -8,16 +8,18 @@ import {
   createTextLayer,
 } from "@/lib/scene/factory";
 import {
+  classifyFile,
   downloadSceneJson,
   importSceneJson,
+  readAssetFile,
   readFileAsText,
-  readImageFile,
 } from "@/lib/io/file";
+import { createAsset, createImageLayerFromAsset } from "@/lib/scene/factory";
 import {
   IconCircle,
   IconDownload,
-  IconImage,
   IconLayers,
+  IconMenu,
   IconRedo,
   IconSpark,
   IconSquare,
@@ -60,34 +62,58 @@ export function Toolbar() {
   const name = useStore((s) => s.scene.name);
   const update = useStore((s) => s.update);
   const setShowExport = useStore((s) => s.setShowExport);
+  const setShowSettings = useStore((s) => s.setShowSettings);
   const setShowPrinciples = useStore((s) => s.setShowPrinciples);
   const showPrinciples = useStore((s) => s.showPrinciples);
+  const setLeftTab = useStore((s) => s.setLeftTab);
 
-  const jsonInput = useRef<HTMLInputElement>(null);
-  const imgInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
 
-  const handleImportJson = async (file: File) => {
-    const text = await readFileAsText(file);
-    const result = importSceneJson(text);
-    if (result.ok && result.scene) loadScene(result.scene);
-    else alert(result.error ?? "Import failed");
-  };
-
-  const handleImportImage = async (file: File) => {
-    const { src, width, height } = await readImageFile(file);
-    // Scale large images down to a sensible default footprint.
-    const max = 600;
-    const s = Math.min(1, max / Math.max(width, height));
-    const layer = createImageLayer(src, width * s, height * s, {
-      name: file.name.replace(/\.[^.]+$/, ""),
-    });
-    addLayer(layer);
+  /**
+   * Unified Import: a .loft.json scene loads as the project; media files are
+   * added as project assets (and images also placed as a layer). Everything is
+   * read locally — nothing is uploaded.
+   */
+  const handleImport = async (files: FileList | File[]) => {
+    const store = useStore.getState();
+    for (const file of Array.from(files)) {
+      if (/\.(json)$/i.test(file.name)) {
+        const text = await readFileAsText(file);
+        const result = importSceneJson(text);
+        if (result.ok && result.scene) loadScene(result.scene);
+        else alert(result.error ?? "Import failed");
+        continue;
+      }
+      const kind = classifyFile(file);
+      if (kind === "unsupported") {
+        alert(`"${file.name}" isn't a supported media type.`);
+        continue;
+      }
+      const r = await readAssetFile(file);
+      const asset = createAsset(kind, r.name, r.src, {
+        width: r.width,
+        height: r.height,
+        size: r.size,
+        duration: r.duration,
+      });
+      store.addAsset(asset);
+      setLeftTab("project");
+      // Images get placed into the comp immediately, like AE drag-to-comp.
+      if (kind === "image") {
+        store.addLayer(createImageLayerFromAsset(asset, store.scene.composition));
+      }
+    }
   };
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-850 px-3">
+      {/* Hamburger → scene settings */}
+      <ToolButton title="Scene settings" onClick={() => setShowSettings(true)}>
+        <IconMenu />
+      </ToolButton>
+
       {/* Brand */}
-      <div className="flex items-center gap-2 pr-2">
+      <div className="flex items-center gap-2 pr-1">
         <div className="grid h-6 w-6 place-items-center rounded bg-brand-500 text-white">
           <IconLayers width={14} height={14} />
         </div>
@@ -111,9 +137,6 @@ export function Toolbar() {
         </ToolButton>
         <ToolButton title="Add text" onClick={() => addLayer(createTextLayer())}>
           <IconText />
-        </ToolButton>
-        <ToolButton title="Add image" onClick={() => imgInput.current?.click()}>
-          <IconImage />
         </ToolButton>
       </div>
 
@@ -154,12 +177,15 @@ export function Toolbar() {
         Craft
       </button>
 
-      {/* JSON import/export */}
-      <ToolButton title="Import scene JSON" onClick={() => jsonInput.current?.click()}>
+      {/* Import (scene JSON or media) / save scene */}
+      <ToolButton
+        title="Import media or scene"
+        onClick={() => importInput.current?.click()}
+      >
         <IconUpload />
       </ToolButton>
       <ToolButton
-        title="Save scene JSON"
+        title="Save scene (.loft.json)"
         onClick={() => downloadSceneJson(useStore.getState().scene)}
       >
         <IconDownload />
@@ -173,26 +199,15 @@ export function Toolbar() {
         Export
       </button>
 
-      {/* Hidden file inputs */}
+      {/* Hidden file input — accepts a scene JSON or any supported media. */}
       <input
-        ref={jsonInput}
+        ref={importInput}
         type="file"
-        accept="application/json,.json"
+        accept="application/json,.json,image/*,video/*,audio/*"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleImportJson(f);
-          e.target.value = "";
-        }}
-      />
-      <input
-        ref={imgInput}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleImportImage(f);
+          if (e.target.files?.length) handleImport(e.target.files);
           e.target.value = "";
         }}
       />
