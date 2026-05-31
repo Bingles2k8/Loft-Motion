@@ -105,6 +105,8 @@ export function createShapeLayer(
     timing: { start: 0, end: 5 },
     effects: [],
     behaviors: [],
+    masks: [],
+    matte: "none",
     shape: {
       kind,
       width: kind === "ellipse" ? 280 : 320,
@@ -132,6 +134,8 @@ export function createTextLayer(init: LayerInit = {}): Layer {
     timing: { start: 0, end: 5 },
     effects: [],
     behaviors: [],
+    masks: [],
+    matte: "none",
     text: {
       content: "Loft Motion",
       fontSize: 120,
@@ -165,7 +169,63 @@ export function createImageLayer(
     timing: { start: 0, end: 5 },
     effects: [],
     behaviors: [],
+    masks: [],
+    matte: "none",
     image: { assetId, src, naturalWidth, naturalHeight },
+  };
+}
+
+/** A null object — an invisible transform controller for parenting/rigging. */
+export function createNullLayer(init: LayerInit = {}): Layer {
+  const { name = "Null", x = 960, y = 540 } = init;
+  return {
+    id: uid("layer"),
+    name,
+    type: "null",
+    visible: true,
+    locked: false,
+    solo: false,
+    label: 0,
+    blendMode: "normal",
+    parentId: null,
+    transform: defaultTransform(x, y),
+    timing: { start: 0, end: 5 },
+    effects: [],
+    behaviors: [],
+    masks: [],
+    matte: "none",
+  };
+}
+
+/** An adjustment layer — its effects apply to everything beneath it. */
+export function createAdjustmentLayer(init: LayerInit = {}): Layer {
+  const { name = "Adjustment", x = 960, y = 540 } = init;
+  return {
+    id: uid("layer"),
+    name,
+    type: "adjustment",
+    visible: true,
+    locked: false,
+    solo: false,
+    label: 0,
+    blendMode: "normal",
+    parentId: null,
+    transform: defaultTransform(x, y),
+    timing: { start: 0, end: 5 },
+    effects: [],
+    behaviors: [],
+    masks: [],
+    matte: "none",
+  };
+}
+
+/** Default trim-paths config (animatable start/end/offset). */
+export function createTrim() {
+  return {
+    enabled: true,
+    start: anim(0),
+    end: anim(100),
+    offset: anim(0),
   };
 }
 

@@ -196,6 +196,19 @@ export const IconGrid = (p: P) => (
     <rect x="14" y="14" width="7" height="7" rx="1" />
   </svg>
 );
+export const IconNull = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="5" y="5" width="14" height="14" rx="1" strokeDasharray="3 2" />
+    <path d="M9 9l6 6M15 9l-6 6" />
+  </svg>
+);
+export const IconAdjust = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 12h18" />
+    <circle cx="9" cy="12" r="2" fill="currentColor" stroke="none" />
+  </svg>
+);
 export const IconStopwatch = (p: P) => (
   <svg {...base(p)}>
     <circle cx="12" cy="13" r="8" />

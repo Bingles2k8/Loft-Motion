@@ -17,7 +17,8 @@ import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
 import { BEHAVIOR_LIST, behaviorDef } from "@/lib/anim/behaviorCatalog";
 import { applyPreset, BEHAVIOR_PRESETS } from "@/lib/anim/behaviors";
 import { AUTO_ANIMATE_LABELS, AUTO_ANIMATE_PRESETS } from "@/lib/anim/autoAnimate";
-import { CLONER_MODES, type BehaviorType } from "@/lib/scene/schema";
+import { CLONER_MODES, MATTE_MODES, type BehaviorType } from "@/lib/scene/schema";
+import { createTrim } from "@/lib/scene/factory";
 import {
   BLEND_MODES,
   EXPORT_TARGETS,
@@ -316,11 +317,38 @@ function LayerProperties({ layer }: { layer: Layer }) {
           <TextInput value={layer.name} onChange={(v) => set((l) => (l.name = v))} />
         </Row>
         <Row>
+          <Label>Parent</Label>
+          <Select
+            value={layer.parentId ?? ""}
+            onChange={(v) => set((l) => (l.parentId = v || null))}
+            options={[
+              { value: "", label: "None" },
+              ...scene.layers
+                .filter((l) => l.id !== layer.id)
+                .map((l) => ({ value: l.id, label: l.name })),
+            ]}
+          />
+        </Row>
+        <Row>
           <Label>Blend</Label>
           <Select
             value={layer.blendMode}
             onChange={(v) => set((l) => (l.blendMode = v as Layer["blendMode"]))}
             options={BLEND_MODES.map((b) => ({ value: b, label: cap(b) }))}
+          />
+        </Row>
+        <Row>
+          <Label>Track matte</Label>
+          <Select
+            value={layer.matte}
+            onChange={(v) => set((l) => (l.matte = v as Layer["matte"]))}
+            options={MATTE_MODES.map((m) => ({
+              value: m,
+              label:
+                m === "none"
+                  ? "None"
+                  : m.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            }))}
           />
         </Row>
         <Row>
@@ -467,6 +495,10 @@ function LayerProperties({ layer }: { layer: Layer }) {
         </Section>
       )}
 
+      {layer.type === "shape" && shape && (
+        <StrokeTrimSection layer={layer} />
+      )}
+
       {layer.type === "text" && text && (
         <Section title="Text" collapsible>
           <Row>
@@ -524,6 +556,122 @@ function LayerProperties({ layer }: { layer: Layer }) {
 }
 
 /* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*  Stroke & Trim Paths (draw-on animation)                                    */
+/* -------------------------------------------------------------------------- */
+
+function StrokeTrimSection({ layer }: { layer: Layer }) {
+  const updateLayer = useStore((s) => s.updateLayer);
+  const beginChange = useStore((s) => s.beginChange);
+  const set = (patch: (l: Layer) => void, live = false) =>
+    updateLayer(layer.id, patch, live);
+  const shape = layer.shape!;
+  const stroke = shape.stroke;
+  const trim = shape.trim;
+
+  return (
+    <Section
+      title="Stroke & Trim"
+      collapsible
+      defaultOpen={false}
+      right={
+        <label className="flex items-center gap-1.5 text-[10px] text-haze-400">
+          <input
+            type="checkbox"
+            checked={!!stroke}
+            onChange={(e) =>
+              set((l) => {
+                if (e.target.checked)
+                  l.shape!.stroke = { color: "#ffffff", width: 6, cap: "round" };
+                else l.shape!.stroke = undefined;
+              })
+            }
+          />
+          stroke
+        </label>
+      }
+    >
+      {!stroke ? (
+        <p className="text-[11px] text-haze-500">
+          Add a stroke to enable dashed lines and Trim-Paths draw-on animation.
+        </p>
+      ) : (
+        <>
+          <Row>
+            <Label>Colour</Label>
+            <ColorInput
+              value={stroke.color}
+              onChange={(v) => set((l) => (l.shape!.stroke!.color = v))}
+            />
+          </Row>
+          <Row>
+            <Label>Width</Label>
+            <NumberInput
+              value={stroke.width}
+              min={0}
+              onCommitStart={beginChange}
+              onChange={(v, live) => set((l) => (l.shape!.stroke!.width = v), live)}
+            />
+          </Row>
+          <Row>
+            <Label>Dash</Label>
+            <NumberInput
+              value={stroke.dash ?? 0}
+              min={0}
+              onCommitStart={beginChange}
+              onChange={(v, live) => set((l) => (l.shape!.stroke!.dash = v), live)}
+            />
+            <NumberInput
+              value={stroke.gap ?? 0}
+              min={0}
+              onCommitStart={beginChange}
+              onChange={(v, live) => set((l) => (l.shape!.stroke!.gap = v), live)}
+            />
+          </Row>
+          <div className="my-1 border-t border-ink-800" />
+          <Row>
+            <Label>Trim paths</Label>
+            <label className="flex flex-1 items-center gap-2 text-xs text-haze-300">
+              <input
+                type="checkbox"
+                checked={!!trim?.enabled}
+                onChange={(e) =>
+                  set((l) => {
+                    if (e.target.checked) l.shape!.trim = createTrim();
+                    else if (l.shape!.trim) l.shape!.trim.enabled = false;
+                  })
+                }
+              />
+              {trim?.enabled ? "On — keyframe Start/End to draw on" : "Off"}
+            </label>
+          </Row>
+          {trim?.enabled && (
+            <>
+              {(["start", "end", "offset"] as const).map((k) => {
+                const ch = trim[k];
+                const channelPath = `shape.trim.${k}`;
+                return (
+                  <ChannelField
+                    key={k}
+                    layer={layer}
+                    channel={{
+                      path: channelPath,
+                      label: k === "offset" ? "Offset" : cap(k),
+                      unit: k === "offset" ? "°" : "%",
+                      min: k === "offset" ? -360 : 0,
+                      max: k === "offset" ? 360 : 100,
+                    }}
+                  />
+                );
+              })}
+            </>
+          )}
+        </>
+      )}
+    </Section>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Align (to composition frame)                                               */

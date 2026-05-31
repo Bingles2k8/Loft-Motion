@@ -272,6 +272,36 @@ const EXAMPLES: ExampleProject[] = [
       return doc("Neon Orbit", [dot]);
     },
   },
+  {
+    id: "draw-on",
+    name: "Draw-On Lines",
+    blurb: "Self-drawing stroked shapes — Trim Paths animating Start→End.",
+    tools: ["Trim Paths", "Cloner (line)", "Stagger"],
+    build: () => {
+      const ring = createShapeLayer("ellipse", { name: "Stroke", x: 960, y: 540 });
+      ring.shape = {
+        ...ring.shape!,
+        width: 220,
+        height: 220,
+        fill: { color: "#0e0e12" },
+        stroke: { color: "#58c8d6", width: 10, cap: "round" },
+        trim: {
+          enabled: true,
+          start: { value: 0, keyframes: [] },
+          end: {
+            value: 100,
+            keyframes: [
+              { id: uid("kf"), time: 0, value: 0, easing: "settle" },
+              { id: uid("kf"), time: 1.6, value: 100, easing: "settle" },
+            ],
+          },
+          offset: { value: -90, keyframes: [] },
+        },
+      };
+      ring.cloner = cloner({ mode: "line", count: 4, spacingX: 280, stagger: 0.25, stepScale: -10 });
+      return doc("Draw-On Lines", [ring]);
+    },
+  },
 ];
 
 export const EXAMPLE_PROJECTS = EXAMPLES;

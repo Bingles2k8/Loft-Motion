@@ -67,6 +67,9 @@ function layerFeatures(layer: Layer): FeatureUse[] {
     if (layer.shape.stroke) {
       feats.push(matrixFeature("stroke", "Stroke"));
     }
+    if (layer.shape.trim?.enabled) {
+      feats.push(matrixFeature("trim", "Trim paths"));
+    }
   }
   if (layer.type === "text") feats.push(matrixFeature("text", "Text"));
   if (layer.type === "image") feats.push(matrixFeature("image", "Image"));
@@ -74,6 +77,8 @@ function layerFeatures(layer: Layer): FeatureUse[] {
   if (layer.blendMode !== "normal") {
     feats.push(matrixFeature("blendMode", `${cap(layer.blendMode)} blend`));
   }
+  if (layer.masks.length > 0) feats.push(matrixFeature("mask", "Mask"));
+  if (layer.matte !== "none") feats.push(matrixFeature("matte", "Track matte"));
 
   // Effects resolve their compat from the effects catalog (single source).
   for (const effect of layer.effects) {

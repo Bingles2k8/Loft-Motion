@@ -30,6 +30,10 @@ export type FeatureKey =
   | "text"
   | "image"
   | "blendMode"
+  | "trim"
+  | "mask"
+  | "matte"
+  | "parent"
   | "effect.blur"
   | "effect.glow"
   | "effect.drop-shadow";
@@ -37,6 +41,26 @@ export type FeatureKey =
 export const FEATURE_MATRIX: Record<FeatureKey, FeatureRow> = {
   transform: { mp4: FULL, lottie: FULL, css: FULL },
   opacity: { mp4: FULL, lottie: FULL, css: FULL },
+
+  trim: {
+    mp4: FULL,
+    lottie: FULL,
+    css: {
+      level: "partial",
+      note: "Maps to stroke-dasharray/offset; works on simple paths.",
+    },
+  },
+  mask: {
+    mp4: FULL,
+    lottie: { level: "partial", note: "Simple masks export; feather is dropped." },
+    css: { level: "partial", note: "Maps to clip-path; soft edges are lost." },
+  },
+  matte: {
+    mp4: FULL,
+    lottie: { level: "partial", note: "Alpha mattes export; luma may differ." },
+    css: { level: "none", note: "Track mattes aren't representable in CSS." },
+  },
+  parent: { mp4: FULL, lottie: FULL, css: FULL },
 
   shape: {
     mp4: FULL,

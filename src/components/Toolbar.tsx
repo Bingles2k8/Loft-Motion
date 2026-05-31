@@ -3,6 +3,8 @@
 import { useRef } from "react";
 import { useStore } from "@/lib/store/useStore";
 import {
+  createAdjustmentLayer,
+  createNullLayer,
   createShapeLayer,
   createTextLayer,
 } from "@/lib/scene/factory";
@@ -18,8 +20,10 @@ import {
   IconCircle,
   IconDownload,
   IconLayers,
+  IconAdjust,
   IconGrid,
   IconMenu,
+  IconNull,
   IconRedo,
   IconSpark,
   IconSquare,
@@ -138,6 +142,12 @@ export function Toolbar() {
         </ToolButton>
         <ToolButton title="Add text" onClick={() => addLayer(createTextLayer())}>
           <IconText />
+        </ToolButton>
+        <ToolButton title="Add null (transform controller)" onClick={() => addLayer(createNullLayer())}>
+          <IconNull />
+        </ToolButton>
+        <ToolButton title="Add adjustment layer" onClick={() => addLayer(createAdjustmentLayer())}>
+          <IconAdjust />
         </ToolButton>
       </div>
 

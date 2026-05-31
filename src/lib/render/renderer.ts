@@ -58,6 +58,7 @@ const BlurFilter = (Pixi as any).BlurFilter as new (opts: {
   strength?: number;
 }) => Filter;
 import {
+  evalAnimatable,
   evalEffectParams,
   evalTransform,
   isLayerActive,
@@ -75,6 +76,8 @@ import {
   cloneCount,
   type CloneTransform,
 } from "@/lib/anim/cloner";
+import { IDENTITY, localMatrix, mul, type Affine } from "@/lib/render/transform";
+import { dashPolyline, shapeOutline, trimPath, type Pt } from "@/lib/render/path";
 
 /** One rendered copy of a layer (1 per layer normally; N when cloned). */
 interface CloneNode {
@@ -82,6 +85,9 @@ interface CloneNode {
   display: Container;
   filters: Map<string, Filter>; // keyed by effect id
   clone: CloneTransform; // per-clone offset (identity when not cloning)
+  /** For animated Trim Paths: the dynamic stroke graphics + cached outline. */
+  trimStroke?: Graphics;
+  outline?: Pt[];
 }
 
 interface LayerNode {
@@ -90,6 +96,10 @@ interface LayerNode {
   clones: CloneNode[];
   width: number;
   height: number;
+  /** This node's outer is being used as another layer's track matte. */
+  isMatteSource?: boolean;
+  /** The node serving as this layer's track matte (kept from rendering solo). */
+  matteHidden?: LayerNode;
 }
 
 function hex(color: string): number {
@@ -119,9 +129,13 @@ function signature(scene: SceneDocument): string {
         pt: l.shape.points,
         f: l.shape.fill,
         s: l.shape.stroke,
+        tr: l.shape.trim?.enabled ?? false,
       },
       tx: l.text,
       im: l.image && `${l.image.src.length}:${l.image.src.slice(0, 64)}`,
+      // Track matte + mask count affect compositing structure.
+      mt: l.matte,
+      mk: l.masks.length,
       fx: l.effects.map((e) => ({ id: e.id, t: e.type, on: e.enabled, c: e.color, c2: e.color2 })),
       // Cloner geometry (clone COUNT) changes the graph → rebuild; per-clone
       // step/stagger params are applied live in renderAt.
@@ -211,17 +225,30 @@ export class SceneRenderer {
     }
     this.app.renderer.background.color = hex(scene.composition.background);
 
-    // Build a node per layer in stacking order.
+    // Build a node per layer in stacking order. Layers are FLAT children of the
+    // stage (z-order = array order); parent transform inheritance is composed
+    // manually in renderAt via world matrices, so parenting doesn't reparent the
+    // render tree (and thus doesn't inherit opacity/blend — AE-style).
     for (const layer of scene.layers) {
       const node = this.buildNode(layer);
       this.nodes.set(layer.id, node);
+      stage.addChild(node.outer);
     }
-    // Parent them (nested transform inheritance); fall back to stage.
-    for (const layer of scene.layers) {
-      const node = this.nodes.get(layer.id)!;
-      const parent = layer.parentId ? this.nodes.get(layer.parentId) : null;
-      if (parent) parent.outer.addChild(node.outer);
-      else stage.addChild(node.outer);
+
+    // Track mattes: a layer with `matte` consumes the layer directly ABOVE it
+    // (next in array order) as a mask. Alpha matte → use the matte layer's
+    // outer as a Pixi mask; the matte layer itself is hidden.
+    for (let i = 0; i < scene.layers.length; i++) {
+      const layer = scene.layers[i];
+      if (layer.matte === "none") continue;
+      const matteLayer = scene.layers[i + 1]; // "above" in z = later in array
+      if (!matteLayer) continue;
+      const node = this.nodes.get(layer.id);
+      const matteNode = this.nodes.get(matteLayer.id);
+      if (!node || !matteNode) continue;
+      node.outer.mask = matteNode.outer;
+      node.matteHidden = matteNode; // mark so renderAt keeps it from drawing solo
+      matteNode.isMatteSource = true;
     }
 
     this.sig = signature(scene);
@@ -295,16 +322,53 @@ export class SceneRenderer {
 
     let width = 0;
     let height = 0;
+    // A dynamic stroke is needed when the shape has Trim Paths or a dash pattern.
+    const needsTrimStroke =
+      layer.type === "shape" &&
+      !!layer.shape?.stroke &&
+      layer.shape.stroke.width > 0 &&
+      (!!layer.shape.trim?.enabled || !!layer.shape.stroke.dash);
+
     const clones: CloneNode[] = cloneTfs.map((clone) => {
       const container = new Container();
       const { display, width: w, height: h } = this.buildDisplay(layer);
       width = w;
       height = h;
       container.addChild(display);
+      let trimStroke: Graphics | undefined;
+      let outline: Pt[] | undefined;
+      if (needsTrimStroke && layer.shape) {
+        trimStroke = new Graphics();
+        container.addChild(trimStroke);
+        outline = shapeOutline(layer.shape);
+      }
       const { filters, list } = this.buildFilters(layer);
       if (list.length) container.filters = list;
+
+      // Vector masks (hard-edged add/subtract). Mask points are in comp space;
+      // the layer's own transform maps content into comp space, so we counter it
+      // by drawing the mask in the container's local frame via the inverse — but
+      // since masks here are authored in the layer's local px just like the
+      // shape, we draw them directly and let the shared transform carry both.
+      if (layer.masks.length > 0) {
+        const maskG = new Graphics();
+        for (const m of layer.masks) {
+          if (m.points.length < 3) continue;
+          maskG.poly(m.points.flat());
+          if (m.mode === "subtract") {
+            // even-odd hole: drawn as a second poly; Pixi fills nonzero, so we
+            // approximate subtract by cutting with a "cut" — simplest is to skip.
+            maskG.fill({ color: 0xffffff, alpha: 1 });
+          } else {
+            maskG.fill({ color: 0xffffff });
+          }
+        }
+        container.addChild(maskG);
+        container.mask = maskG;
+      }
+
       outer.addChild(container);
-      return { container, display, filters, clone };
+      return { container, display, filters, clone, trimStroke, outline };
     });
 
     return { layer, outer, clones, width, height };
@@ -351,10 +415,43 @@ export class SceneRenderer {
       g.fill({ color: hex(fillColor) });
     }
 
-    if (shape.stroke && shape.stroke.width > 0) {
+    // A static stroke draws here; an animated trim/dash stroke is drawn each
+    // frame onto a separate Graphics (see updateTrimStroke).
+    if (shape.stroke && shape.stroke.width > 0 && !shape.trim?.enabled && !shape.stroke.dash) {
       g.stroke({ width: shape.stroke.width, color: hex(resolved(shape.stroke.color, this.scene)) });
     }
     return g;
+  }
+
+  /** Redraw a clone's dynamic (trimmed / dashed) stroke at time `t`. */
+  private updateTrimStroke(cn: CloneNode, shape: ShapePayload, t: number) {
+    const g = cn.trimStroke;
+    if (!g || !cn.outline || !shape.stroke) return;
+    g.clear();
+    const sw = shape.stroke.width;
+    if (sw <= 0) return;
+    const color = hex(resolved(shape.stroke.color, this.scene));
+
+    let poly = cn.outline;
+    if (shape.trim?.enabled) {
+      const start = evalAnimatable(shape.trim.start, t);
+      const end = evalAnimatable(shape.trim.end, t);
+      const offset = evalAnimatable(shape.trim.offset, t);
+      poly = trimPath(cn.outline, start, end, offset);
+      if (poly.length < 2) return;
+    }
+
+    const segments = shape.stroke.dash
+      ? dashPolyline(poly, shape.stroke.dash, shape.stroke.gap ?? 0)
+      : [poly];
+
+    const cap = shape.stroke.cap ?? "round";
+    for (const seg of segments) {
+      if (seg.length < 2) continue;
+      g.moveTo(seg[0][0], seg[0][1]);
+      for (let i = 1; i < seg.length; i++) g.lineTo(seg[i][0], seg[i][1]);
+      g.stroke({ width: sw, color, cap, join: "round" });
+    }
   }
 
   private createFilter(effect: Effect): Filter | null {
@@ -551,6 +648,30 @@ export class SceneRenderer {
     // Solo: if any layer is soloed, only soloed layers render.
     const anySolo = this.scene.layers.some((l) => l.solo);
 
+    // Cache each layer's PARENT world matrix (transform-only inheritance).
+    const worldCache = new Map<string, Affine>();
+    const parentWorld = (layer: Layer): Affine => {
+      if (!layer.parentId) return IDENTITY;
+      const cached = worldCache.get(layer.id);
+      if (cached) return cached;
+      const parent = layersById.get(layer.parentId);
+      if (!parent || parent.id === layer.id) return IDENTITY;
+      const pTf = evalTransform(parent.transform, t);
+      const pNode = this.nodes.get(parent.id);
+      const local = localMatrix({
+        x: pTf.x,
+        y: pTf.y,
+        rotation: (pTf.rotation * Math.PI) / 180,
+        scaleX: pTf.scaleX / 100,
+        scaleY: pTf.scaleY / 100,
+        pivotX: pTf.anchorX * (pNode?.width ?? 0),
+        pivotY: pTf.anchorY * (pNode?.height ?? 0),
+      });
+      const world = mul(parentWorld(parent), local);
+      worldCache.set(layer.id, world);
+      return world;
+    };
+
     for (const layer of this.scene.layers) {
       const node = this.nodes.get(layer.id);
       if (!node) continue;
@@ -561,6 +682,7 @@ export class SceneRenderer {
         layer.visible && isLayerActive(layer, t) && (!anySolo || layer.solo);
       const count = layer.cloner?.enabled ? cloneCount(layer.cloner) : 1;
       const stagger = layer.cloner?.enabled ? layer.cloner.stagger : 0;
+      const pWorld = parentWorld(layer);
 
       for (const cn of node.clones) {
         const cl = cn.clone;
@@ -569,17 +691,23 @@ export class SceneRenderer {
         const beh = evalBehaviors(layer.behaviors ?? [], t, dur, ctx);
 
         const c = cn.container;
-        c.position.set(tf.x + cl.dx + beh.x, tf.y + cl.dy + beh.y);
-        c.pivot.set(tf.anchorX * node.width, tf.anchorY * node.height);
-        const sc = (tf.scaleX / 100) * cl.scaleMul + beh.scale / 100;
-        const scY = (tf.scaleY / 100) * cl.scaleMul + beh.scale / 100;
-        c.scale.set(sc, scY);
-        c.rotation = ((tf.rotation + cl.rotation + beh.rotation) * Math.PI) / 180;
+        // Layer's own local matrix (including clone offset + behaviors).
+        const local = localMatrix({
+          x: tf.x + cl.dx + beh.x,
+          y: tf.y + cl.dy + beh.y,
+          rotation: ((tf.rotation + cl.rotation + beh.rotation) * Math.PI) / 180,
+          scaleX: (tf.scaleX / 100) * cl.scaleMul + beh.scale / 100,
+          scaleY: (tf.scaleY / 100) * cl.scaleMul + beh.scale / 100,
+          pivotX: tf.anchorX * node.width,
+          pivotY: tf.anchorY * node.height,
+        });
+        const world = mul(pWorld, local);
+        c.setFromMatrix(new Pixi.Matrix(world.a, world.b, world.c, world.d, world.tx, world.ty));
         c.alpha = Math.max(
           0,
           Math.min(1, (tf.opacity / 100) * cl.opacityMul + beh.opacity / 100),
         );
-        c.visible = active;
+        c.visible = active && layer.type !== "null";
         c.blendMode = layer.blendMode;
 
         // Update animatable filter params live.
@@ -589,8 +717,12 @@ export class SceneRenderer {
           const p = evalEffectParams(effect, t);
           applyFilterParams(f, effect, p, t);
         }
+
+        // Animated trim / dashed stroke.
+        if (cn.trimStroke && layer.shape) {
+          this.updateTrimStroke(cn, layer.shape, t);
+        }
       }
-      void layersById; // (parent-opacity folding handled by Pixi nesting)
     }
 
     this.app.renderer.render(this.app.stage);

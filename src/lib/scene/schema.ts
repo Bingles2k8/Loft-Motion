@@ -161,8 +161,22 @@ export type Fill = z.infer<typeof zFill>;
 export const zStroke = z.object({
   color: z.string(),
   width: z.number().min(0),
+  /** Dash pattern length (0/undefined = solid). */
+  dash: z.number().min(0).optional(),
+  /** Gap between dashes (defaults to dash when omitted and dash>0). */
+  gap: z.number().min(0).optional(),
+  cap: z.enum(["butt", "round", "square"]).optional(),
 });
 export type Stroke = z.infer<typeof zStroke>;
+
+/** Trim Paths — animatable start/end/offset (%) for stroke draw-on. */
+export const zTrim = z.object({
+  enabled: z.boolean().default(false),
+  start: zAnimatable, // 0..100
+  end: zAnimatable, // 0..100
+  offset: zAnimatable, // degrees of travel around the path
+});
+export type Trim = z.infer<typeof zTrim>;
 
 export const zShapePayload = z.object({
   kind: z.enum(SHAPE_KINDS),
@@ -172,6 +186,7 @@ export const zShapePayload = z.object({
   points: z.number().int().min(3).default(5), // for polygon/star
   fill: zFill,
   stroke: zStroke.optional(),
+  trim: zTrim.optional(),
 });
 export type ShapePayload = z.infer<typeof zShapePayload>;
 
@@ -201,7 +216,7 @@ export type ImagePayload = z.infer<typeof zImagePayload>;
 /*  Layer                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export const LAYER_TYPES = ["shape", "text", "image", "group"] as const;
+export const LAYER_TYPES = ["shape", "text", "image", "group", "null", "adjustment"] as const;
 export type LayerType = (typeof LAYER_TYPES)[number];
 
 export const BLEND_MODES = [
@@ -310,6 +325,30 @@ export const LABEL_COLORS = [
   "#9b7cff", // violet
 ] as const;
 
+/* -------------------------------------------------------------------------- */
+/*  Masks & track mattes                                                       */
+/* -------------------------------------------------------------------------- */
+
+export const MASK_MODES = ["add", "subtract"] as const;
+export type MaskMode = (typeof MASK_MODES)[number];
+
+/** A vector mask path: a closed polyline of points in layer-local px. */
+export const zMask = z.object({
+  id: z.string(),
+  mode: z.enum(MASK_MODES).default("add"),
+  /** Polygon vertices (comp space). */
+  points: z.array(z.tuple([z.number(), z.number()])).default([]),
+  feather: z.number().min(0).default(0),
+  /** Grow/shrink the mask edge (px). */
+  expansion: z.number().default(0),
+  inverted: z.boolean().default(false),
+});
+export type Mask = z.infer<typeof zMask>;
+
+/** Track matte: use the layer ABOVE this one as a mask. */
+export const MATTE_MODES = ["none", "alpha", "luma", "alpha-inverted", "luma-inverted"] as const;
+export type MatteMode = (typeof MATTE_MODES)[number];
+
 export const zLayer = z.object({
   id: z.string(),
   name: z.string(),
@@ -327,6 +366,9 @@ export const zLayer = z.object({
   effects: z.array(zEffect).default([]),
   behaviors: z.array(zBehavior).default([]),
   cloner: zCloner.optional(),
+  masks: z.array(zMask).default([]),
+  /** Track matte: consume the layer directly above as a matte. */
+  matte: z.enum(MATTE_MODES).default("none"),
 
   // Payloads — exactly one is present, matching `type`.
   shape: zShapePayload.optional(),
