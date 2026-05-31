@@ -9,8 +9,8 @@
  *
  * Returns a self-contained HTML document the user can paste into a file and open.
  */
-import { easingToCss } from "@/lib/anim/easing";
-import { isAnimated } from "@/lib/anim/evaluate";
+import { bezierToCss } from "@/lib/anim/easing";
+import { isAnimated, keyframeBezier } from "@/lib/anim/evaluate";
 import { analyzeScene } from "@/lib/capability/engine";
 import type { Animatable, Layer, SceneDocument } from "@/lib/scene/schema";
 
@@ -40,7 +40,7 @@ function channelAnimation(
   }
   kfs.forEach((k, i) => {
     const pct = clamp((k.time / duration) * 100, 0, 100);
-    const easing = i < kfs.length - 1 ? easingToCss(k.easing) : null;
+    const easing = i < kfs.length - 1 ? bezierToCss(keyframeBezier(k)) : null;
     const timing = easing ? ` animation-timing-function: ${easing};` : "";
     stops.push(`  ${round(pct)}% { ${decl(k.value)};${timing} }`);
   });

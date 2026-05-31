@@ -5,12 +5,16 @@ import { useStore } from "@/lib/store/useStore";
 import { Toolbar } from "@/components/Toolbar";
 import { Stage } from "@/components/Stage";
 import { Timeline } from "@/components/timeline/Timeline";
+import { LeftDock } from "@/components/panels/LeftDock";
 import { PropertiesPanel } from "@/components/panels/PropertiesPanel";
 import { ExportPanel } from "@/components/panels/ExportPanel";
 import { PrinciplesPanel } from "@/components/panels/PrinciplesPanel";
+import { Splitter } from "@/components/ui/Splitter";
 
 export function Editor() {
   const playing = useStore((s) => s.playing);
+  const sizes = useStore((s) => s.sizes);
+  const setPanelSize = useStore((s) => s.setPanelSize);
 
   // Playback loop — advances the playhead off the store directly so it doesn't
   // thrash React. The renderer reacts to `time` via Stage.
@@ -61,18 +65,23 @@ export function Editor() {
         e.preventDefault();
         s.togglePlay();
       } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (s.selectedKeyframe) {
-          s.removeKeyframe(
-            s.selectedKeyframe.layerId,
-            s.selectedKeyframe.channelPath,
-            s.selectedKeyframe.kfId,
-          );
-          s.selectKeyframe(null);
+        if (s.selectedKeys.length > 0) {
+          s.deleteSelection();
         } else if (s.selectedLayerId) {
           s.removeLayer(s.selectedLayerId);
         }
       } else if (e.key === "Home") {
         s.setTime(0);
+      } else if (e.key === "ArrowLeft" && s.selectedKeys.length > 0) {
+        e.preventDefault();
+        s.beginChange();
+        s.nudgeSelection(-1 / s.scene.composition.fps);
+      } else if (e.key === "ArrowRight" && s.selectedKeys.length > 0) {
+        e.preventDefault();
+        s.beginChange();
+        s.nudgeSelection(1 / s.scene.composition.fps);
+      } else if (e.key.toLowerCase() === "g" && e.shiftKey) {
+        s.toggleGraphMode();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -80,17 +89,53 @@ export function Editor() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-ink-900 text-white">
+    <div className="flex h-screen flex-col overflow-hidden bg-ink-950 text-haze-200">
       <Toolbar />
+
+      {/* Upper region: left dock | stage | properties */}
       <div className="flex min-h-0 flex-1">
+        <div className="shrink-0" style={{ width: sizes.left }}>
+          <LeftDock />
+        </div>
+        <Splitter
+          orientation="vertical"
+          onResize={(d) =>
+            setPanelSize("left", clamp(sizes.left + d, 200, 480))
+          }
+        />
+
         <Stage />
-        <PropertiesPanel />
+
+        <Splitter
+          orientation="vertical"
+          invert
+          onResize={(d) =>
+            setPanelSize("right", clamp(sizes.right + d, 240, 520))
+          }
+        />
+        <div className="shrink-0" style={{ width: sizes.right }}>
+          <PropertiesPanel />
+        </div>
       </div>
-      <div className="h-72 shrink-0 border-t border-ink-700">
+
+      {/* Timeline divider + timeline */}
+      <Splitter
+        orientation="horizontal"
+        invert
+        onResize={(d) =>
+          setPanelSize("bottom", clamp(sizes.bottom + d, 160, 640))
+        }
+      />
+      <div className="shrink-0" style={{ height: sizes.bottom }}>
         <Timeline />
       </div>
+
       <ExportPanel />
       <PrinciplesPanel />
     </div>
   );
+}
+
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
 }

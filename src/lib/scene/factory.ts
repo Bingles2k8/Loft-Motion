@@ -8,6 +8,8 @@
 import {
   SCENE_VERSION,
   type Animatable,
+  type Asset,
+  type AssetType,
   type Composition,
   type Effect,
   type EffectType,
@@ -59,7 +61,7 @@ export function defaultComposition(): Composition {
     height: 1080,
     fps: 30,
     duration: 5,
-    background: "#0b0b12",
+    background: "#141414",
   };
 }
 
@@ -73,7 +75,7 @@ export function createEffect(type: EffectType): Effect {
     case "glow":
       params.strength = anim(12);
       params.innerStrength = anim(2);
-      color = "#7c5cff";
+      color = "#79aede";
       break;
     case "drop-shadow":
       params.distance = anim(12);
@@ -114,7 +116,7 @@ export function createShapeLayer(
       height: kind === "ellipse" ? 280 : 200,
       cornerRadius: kind === "rect" ? 24 : 0,
       points: 5,
-      fill: { color: "#7c5cff" },
+      fill: { color: "#4f8fcb" },
     },
   };
 }
@@ -148,9 +150,9 @@ export function createImageLayer(
   src: string,
   naturalWidth: number,
   naturalHeight: number,
-  init: LayerInit = {},
+  init: LayerInit & { assetId?: string } = {},
 ): Layer {
-  const { name = "Image", x = 960, y = 540 } = init;
+  const { name = "Image", x = 960, y = 540, assetId } = init;
   return {
     id: uid("layer"),
     name,
@@ -162,8 +164,47 @@ export function createImageLayer(
     transform: defaultTransform(x, y),
     timing: { start: 0, end: 5 },
     effects: [],
-    image: { src, naturalWidth, naturalHeight },
+    image: { assetId, src, naturalWidth, naturalHeight },
   };
+}
+
+/** Build a project asset record from an imported file's data URL + metadata. */
+export function createAsset(
+  type: AssetType,
+  name: string,
+  src: string,
+  meta: { width?: number; height?: number; size?: number; duration?: number } = {},
+): Asset {
+  return {
+    id: uid("asset"),
+    name,
+    type,
+    src,
+    width: meta.width ?? 0,
+    height: meta.height ?? 0,
+    size: meta.size ?? 0,
+    duration: meta.duration,
+  };
+}
+
+/** Create an image layer that references a project asset, fit to the comp. */
+export function createImageLayerFromAsset(
+  asset: Asset,
+  comp: Composition,
+): Layer {
+  const max = Math.min(comp.width, comp.height) * 0.6;
+  const scale = Math.min(1, max / Math.max(asset.width || max, asset.height || max));
+  return createImageLayer(
+    asset.src,
+    (asset.width || max) * scale,
+    (asset.height || max) * scale,
+    {
+      name: asset.name.replace(/\.[^.]+$/, ""),
+      x: comp.width / 2,
+      y: comp.height / 2,
+      assetId: asset.id,
+    },
+  );
 }
 
 export function createLayer(type: LayerType): Layer {
@@ -188,6 +229,7 @@ export function emptyScene(): SceneDocument {
     name: "Untitled",
     composition: defaultComposition(),
     layers: [],
+    assets: [],
   };
 }
 
@@ -197,18 +239,19 @@ export function emptyScene(): SceneDocument {
  * layer (the glow won't survive Lottie).
  */
 export function sampleScene(): SceneDocument {
-  const comp = defaultComposition();
+  const comp = { ...defaultComposition(), background: "#141414" };
 
-  // Background panel with a gradient that gently breathes in scale.
+  // Background panel that gently breathes in scale.
   const panel: Layer = {
     ...createShapeLayer("rect", { name: "Backdrop", x: 960, y: 540 }),
     shape: {
       kind: "rect",
       width: 1200,
       height: 700,
-      cornerRadius: 48,
+      cornerRadius: 32,
       points: 5,
-      fill: { color: "#1a1430", gradient: { to: "#241a4d", angle: 120 } },
+      fill: { color: "#1e1e1e" },
+      stroke: { color: "#2e2e2e", width: 2 },
     },
     transform: {
       ...defaultTransform(960, 540),
@@ -218,6 +261,7 @@ export function sampleScene(): SceneDocument {
   };
 
   // A trio of dots that rise and fade in with a stagger — overlapping action.
+  const dotColors = ["#4f8fcb", "#58c8d6", "#d6d6d6"];
   const dots: Layer[] = [0, 1, 2].map((i) => {
     const startY = 620;
     const layer = createShapeLayer("ellipse", {
@@ -234,7 +278,7 @@ export function sampleScene(): SceneDocument {
         height: 120,
         cornerRadius: 0,
         points: 5,
-        fill: { color: ["#7c5cff", "#ff5c9d", "#5ce1ff"][i] },
+        fill: { color: dotColors[i] },
       },
       effects: [createEffect("glow")],
       transform: {
@@ -259,7 +303,7 @@ export function sampleScene(): SceneDocument {
       fontFamily: "Inter, system-ui, sans-serif",
       fontWeight: 800,
       align: "center",
-      fill: "#ffffff",
+      fill: "#f2f2f2",
       letterSpacing: -2,
     },
     transform: {
@@ -274,5 +318,6 @@ export function sampleScene(): SceneDocument {
     name: "Welcome to Loft Motion",
     composition: comp,
     layers: [panel, ...dots, title],
+    assets: [],
   };
 }

@@ -43,7 +43,7 @@ function ToolButton({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="flex h-8 w-8 items-center justify-center rounded-md text-haze-300 transition hover:bg-ink-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+      className="flex h-8 w-8 items-center justify-center rounded text-haze-300 transition hover:bg-ink-700 hover:text-haze-200 disabled:cursor-default disabled:opacity-30"
     >
       {children}
     </button>
@@ -85,16 +85,18 @@ export function Toolbar() {
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-850 px-3">
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-850 px-3">
       {/* Brand */}
       <div className="flex items-center gap-2 pr-2">
-        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-brand-400 to-rose-400 text-white">
-          <IconLayers width={16} height={16} />
+        <div className="grid h-6 w-6 place-items-center rounded bg-brand-500 text-white">
+          <IconLayers width={14} height={14} />
         </div>
-        <span className="text-sm font-bold tracking-tight">Loft Motion</span>
+        <span className="text-sm font-semibold tracking-tight text-haze-200">
+          Loft Motion
+        </span>
       </div>
 
-      <div className="mx-1 h-5 w-px bg-ink-600" />
+      <div className="mx-1 h-5 w-px bg-ink-700" />
 
       {/* Add layers */}
       <div className="flex items-center gap-0.5">
@@ -115,7 +117,7 @@ export function Toolbar() {
         </ToolButton>
       </div>
 
-      <div className="mx-1 h-5 w-px bg-ink-600" />
+      <div className="mx-1 h-5 w-px bg-ink-700" />
 
       {/* History */}
       <ToolButton title="Undo (⌘Z)" onClick={undo} disabled={!canUndo}>
@@ -134,7 +136,7 @@ export function Toolbar() {
               s.name = e.target.value;
             })
           }
-          className="w-full max-w-xs rounded-md bg-transparent px-2 py-1 text-center text-sm font-medium text-haze-300 transition hover:bg-ink-800 focus:bg-ink-800 focus:text-white focus:outline-none"
+          className="mx-auto block w-full max-w-xs rounded bg-transparent px-2 py-1 text-center text-sm font-medium text-haze-300 transition hover:bg-ink-800 focus:bg-ink-800 focus:text-haze-200 focus:outline-none"
         />
       </div>
 
@@ -142,10 +144,10 @@ export function Toolbar() {
       <button
         onClick={() => setShowPrinciples(!showPrinciples)}
         title="Motion principles"
-        className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
+        className={`flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition ${
           showPrinciples
             ? "bg-brand-500/20 text-brand-300"
-            : "text-haze-300 hover:bg-ink-700 hover:text-white"
+            : "text-haze-300 hover:bg-ink-700 hover:text-haze-200"
         }`}
       >
         <IconSpark width={15} height={15} />
@@ -166,7 +168,7 @@ export function Toolbar() {
       {/* Export */}
       <button
         onClick={() => setShowExport(true)}
-        className="ml-1 flex h-8 items-center gap-1.5 rounded-md bg-gradient-to-r from-brand-500 to-brand-400 px-3.5 text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition hover:brightness-110"
+        className="ml-1 flex h-8 items-center gap-1.5 rounded bg-brand-500 px-3.5 text-xs font-semibold text-white transition hover:bg-brand-400"
       >
         Export
       </button>

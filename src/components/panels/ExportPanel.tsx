@@ -167,7 +167,7 @@ export function ExportPanel() {
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-ink-700">
                 <div
-                  className="h-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all"
+                  className="h-full bg-brand-500 transition-all"
                   style={{ width: `${(progress.frame / progress.total) * 100}%` }}
                 />
               </div>
@@ -216,7 +216,7 @@ export function ExportPanel() {
           <button
             onClick={runExport}
             disabled={disabled}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-400 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-2 rounded bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-400 disabled:cursor-default disabled:opacity-50"
           >
             {busy && (
               <span className="lm-spin inline-block h-3 w-3 rounded-full border-2 border-white/40 border-t-white" />

@@ -8,8 +8,7 @@
  * Named easings map to Lottie's per-keyframe bezier handles (o = out tangent,
  * i = in tangent) so "Settle" looks the same in a Lottie player as on canvas.
  */
-import { getEasing } from "@/lib/anim/easing";
-import { evalAnimatable, isAnimated } from "@/lib/anim/evaluate";
+import { evalAnimatable, isAnimated, keyframeBezier } from "@/lib/anim/evaluate";
 import { analyzeScene } from "@/lib/capability/engine";
 import type {
   Animatable,
@@ -31,7 +30,7 @@ function scalarProp(ch: Animatable, fps: number): any {
   const k = ch.keyframes.map((kf, i, arr) => {
     const node: any = { t: round(kf.time * fps), s: [kf.value] };
     if (i < arr.length - 1) {
-      const [x1, y1, x2, y2] = getEasing(kf.easing).bezier;
+      const [x1, y1, x2, y2] = keyframeBezier(kf);
       node.o = { x: [x1], y: [y1] };
       node.i = { x: [x2], y: [y2] };
     }
@@ -57,8 +56,8 @@ function vec2Prop(
       s: [evalAnimatable(chx, t) * scale, evalAnimatable(chy, t) * scale],
     };
     if (i < times.length - 1) {
-      const seg = segmentEasingAt(chx, t) ?? segmentEasingAt(chy, t) ?? "gentle";
-      const [x1, y1, x2, y2] = getEasing(seg).bezier;
+      const [x1, y1, x2, y2] = segmentBezierAt(chx, t) ??
+        segmentBezierAt(chy, t) ?? [0.33, 0, 0.67, 1];
       node.o = { x: [x1, x1], y: [y1, y1] };
       node.i = { x: [x2, x2], y: [y2, y2] };
     }
@@ -75,9 +74,12 @@ function unionTimes(a: Animatable, b: Animatable): number[] {
   return [...set].sort((x, y) => x - y);
 }
 
-function segmentEasingAt(ch: Animatable, t: number): string | null {
+function segmentBezierAt(
+  ch: Animatable,
+  t: number,
+): [number, number, number, number] | null {
   const kf = ch.keyframes.find((k) => Math.abs(k.time - t) < 1e-4);
-  return kf ? kf.easing : null;
+  return kf ? keyframeBezier(kf) : null;
 }
 
 function shapeItems(layer: Layer, shape: ShapePayload): any[] {

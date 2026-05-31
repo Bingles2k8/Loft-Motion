@@ -1,8 +1,9 @@
 "use client";
 
-import { useStore } from "@/lib/store/useStore";
-import { evalAnimatable, isAnimated } from "@/lib/anim/evaluate";
+import { useStore, type KfRef } from "@/lib/store/useStore";
+import { evalAnimatable, isAnimated, keyframeBezier } from "@/lib/anim/evaluate";
 import { EASINGS, EASING_NAMES } from "@/lib/anim/easing";
+import { QUICK_CURVES } from "@/lib/anim/curve";
 import { analyzeScene } from "@/lib/capability/engine";
 import {
   TRANSFORM_CHANNELS,
@@ -18,6 +19,7 @@ import {
   SHAPE_KINDS,
   TEXT_ALIGN,
   type EffectType,
+  type Keyframe,
   type Layer,
   type SceneDocument,
   type ShapeKind,
@@ -38,90 +40,158 @@ type TextAlign = (typeof TEXT_ALIGN)[number];
 
 export function PropertiesPanel() {
   const selectedLayerId = useStore((s) => s.selectedLayerId);
-  const selectedKeyframe = useStore((s) => s.selectedKeyframe);
+  const selectedKeys = useStore((s) => s.selectedKeys);
   const scene = useStore((s) => s.scene);
   const layer = scene.layers.find((l) => l.id === selectedLayerId) ?? null;
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-850">
-      {selectedKeyframe && <KeyframeEditor />}
+    <aside className="flex h-full flex-col overflow-y-auto border-l border-ink-700 bg-ink-850">
+      {selectedKeys.length > 0 && <KeyframeEditor />}
       {layer ? <LayerProperties layer={layer} /> : <CompositionProperties />}
     </aside>
   );
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Keyframe / easing editor — works on the whole current selection            */
+/* -------------------------------------------------------------------------- */
+
+function resolveKey(scene: SceneDocument, ref: KfRef): Keyframe | null {
+  const layer = scene.layers.find((l) => l.id === ref.layerId);
+  if (!layer) return null;
+  const ch = getChannel(layer, ref.channelPath);
+  return ch?.keyframes.find((k) => k.id === ref.kfId) ?? null;
+}
 
 function KeyframeEditor() {
-  const sel = useStore((s) => s.selectedKeyframe);
   const scene = useStore((s) => s.scene);
+  const selectedKeys = useStore((s) => s.selectedKeys);
   const updateKeyframe = useStore((s) => s.updateKeyframe);
-  const removeKeyframe = useStore((s) => s.removeKeyframe);
-  const selectKeyframe = useStore((s) => s.selectKeyframe);
+  const setEasingForSelection = useStore((s) => s.setEasingForSelection);
+  const setBezierForSelection = useStore((s) => s.setBezierForSelection);
+  const deleteSelection = useStore((s) => s.deleteSelection);
   const beginChange = useStore((s) => s.beginChange);
 
-  if (!sel) return null;
+  const refs = selectedKeys;
+  const single = refs.length === 1 ? resolveKey(scene, refs[0]) : null;
+  const multi = refs.length > 1;
 
-  const layer = scene.layers.find((l) => l.id === sel.layerId);
-  const ch = layer ? getChannel(layer, sel.channelPath) : null;
-  const keyframe = ch?.keyframes.find((k) => k.id === sel.kfId);
-  if (!keyframe) return null;
-
-  const easingDef = EASINGS[keyframe.easing as keyof typeof EASINGS];
+  // Determine a representative easing label for the selection.
+  const keys = refs.map((r) => resolveKey(scene, r)).filter(Boolean) as Keyframe[];
+  const allCustom = keys.length > 0 && keys.every((k) => k.bezier);
+  const sameEasing =
+    keys.length > 0 && keys.every((k) => !k.bezier && k.easing === keys[0].easing)
+      ? keys[0].easing
+      : "";
+  const easingDef = sameEasing ? EASINGS[sameEasing as keyof typeof EASINGS] : null;
 
   return (
     <Section
-      title="Keyframe"
+      title={multi ? `${refs.length} keyframes` : "Keyframe"}
       right={
         <button
-          onClick={() => {
-            removeKeyframe(sel.layerId, sel.channelPath, sel.kfId);
-            selectKeyframe(null);
-          }}
+          onClick={deleteSelection}
           className="text-haze-400 transition hover:text-rose-300"
-          title="Delete keyframe"
+          title="Delete selected keyframe(s)"
         >
           <IconTrash width={14} height={14} />
         </button>
       }
     >
-      <Row>
-        <Label>Value</Label>
-        <NumberInput
-          value={keyframe.value}
-          onCommitStart={beginChange}
-          onChange={(v, live) =>
-            updateKeyframe(sel.layerId, sel.channelPath, sel.kfId, { value: v }, live)
-          }
-        />
-      </Row>
-      <Row>
-        <Label>Time</Label>
-        <NumberInput
-          value={keyframe.time}
-          step={0.05}
-          min={0}
-          suffix="s"
-          onCommitStart={beginChange}
-          onChange={(v, live) =>
-            updateKeyframe(sel.layerId, sel.channelPath, sel.kfId, { time: v }, live)
-          }
-        />
-      </Row>
+      {single && (
+        <>
+          <Row>
+            <Label>Value</Label>
+            <NumberInput
+              value={single.value}
+              onCommitStart={beginChange}
+              onChange={(v, live) =>
+                updateKeyframe(refs[0].layerId, refs[0].channelPath, refs[0].kfId, { value: v }, live)
+              }
+            />
+          </Row>
+          <Row>
+            <Label>Time</Label>
+            <NumberInput
+              value={single.time}
+              step={0.05}
+              min={0}
+              suffix="s"
+              onCommitStart={beginChange}
+              onChange={(v, live) =>
+                updateKeyframe(refs[0].layerId, refs[0].channelPath, refs[0].kfId, { time: v }, live)
+              }
+            />
+          </Row>
+        </>
+      )}
+
       <Row>
         <Label>Easing</Label>
         <Select
-          value={keyframe.easing}
-          onChange={(v) =>
-            updateKeyframe(sel.layerId, sel.channelPath, sel.kfId, { easing: v })
-          }
-          options={EASING_NAMES.map((n) => ({ value: n, label: EASINGS[n].label }))}
+          value={allCustom ? "__custom__" : sameEasing}
+          onChange={(v) => v && v !== "__custom__" && setEasingForSelection(v)}
+          options={[
+            ...(allCustom || !sameEasing
+              ? [{ value: allCustom ? "__custom__" : "", label: allCustom ? "Custom curve" : "Mixed" }]
+              : []),
+            ...EASING_NAMES.map((n) => ({ value: n, label: EASINGS[n].label })),
+          ]}
         />
       </Row>
-      {easingDef && (
-        <p className="text-[11px] leading-relaxed text-haze-500">{easingDef.blurb}</p>
+
+      {/* Quick curve presets (also reachable in the graph editor). */}
+      <div className="flex flex-wrap gap-1">
+        {QUICK_CURVES.map((c) => (
+          <button
+            key={c.label}
+            onClick={() => setBezierForSelection(c.bezier)}
+            className="rounded bg-ink-700 px-1.5 py-0.5 text-[10px] text-haze-300 transition hover:bg-ink-600 hover:text-haze-200"
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Curve preview of the (single/representative) keyframe. */}
+      {single && (
+        <div className="flex items-center gap-2 pt-1">
+          <CurveThumb bezier={keyframeBezier(single)} />
+          <p className="text-[11px] leading-snug text-haze-500">
+            {single.bezier
+              ? "Custom curve — reshape it in the Graph editor."
+              : easingDef?.blurb}
+          </p>
+        </div>
+      )}
+      {multi && (
+        <p className="text-[11px] leading-relaxed text-haze-500">
+          Set an easing or quick curve to apply it to all {refs.length} selected
+          keyframes. Drag to marquee-select more in the timeline.
+        </p>
       )}
     </Section>
+  );
+}
+
+function CurveThumb({ bezier }: { bezier: [number, number, number, number] }) {
+  const [x1, y1, x2, y2] = bezier;
+  const W = 44;
+  const H = 44;
+  const pad = 6;
+  const sx = (x: number) => pad + x * (W - 2 * pad);
+  const sy = (y: number) => H - pad - y * (H - 2 * pad);
+  return (
+    <svg width={W} height={H} className="shrink-0 rounded bg-ink-900 ring-1 ring-ink-700">
+      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="#2b2b2b" />
+      <line x1={sx(0)} y1={sy(1)} x2={sx(1)} y2={sy(1)} stroke="#2b2b2b" />
+      <path
+        d={`M ${sx(0)} ${sy(0)} C ${sx(x1)} ${sy(y1)}, ${sx(x2)} ${sy(y2)}, ${sx(1)} ${sy(1)}`}
+        fill="none"
+        stroke="#4f8fcb"
+        strokeWidth={1.5}
+      />
+    </svg>
   );
 }
 

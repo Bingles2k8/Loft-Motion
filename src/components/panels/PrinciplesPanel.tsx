@@ -21,7 +21,7 @@ function EasingCurve({ bezier }: { bezier: [number, number, number, number] }) {
       <path
         d={`M ${sx(0)} ${sy(0)} C ${sx(x1)} ${sy(y1)}, ${sx(x2)} ${sy(y2)}, ${sx(1)} ${sy(1)}`}
         fill="none"
-        stroke="#957bff"
+        stroke="#4f8fcb"
         strokeWidth={2}
         strokeLinecap="round"
       />

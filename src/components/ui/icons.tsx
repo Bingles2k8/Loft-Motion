@@ -147,3 +147,45 @@ export const IconLayers = (p: P) => (
     <polyline points="2 15.5 12 22 22 15.5" />
   </svg>
 );
+export const IconGraph = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 3v18h18" />
+    <path d="M5 15c4 0 4-8 8-8s4 6 6 6" />
+  </svg>
+);
+export const IconFx = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M5 4h6M8 4v16" />
+    <path d="M13 9h7M16 9c0 6-1 9-4 9" />
+  </svg>
+);
+export const IconFolder = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>
+);
+export const IconSearch = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="M21 21l-4.3-4.3" />
+  </svg>
+);
+export const IconFilm = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+  </svg>
+);
+export const IconMusic = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M9 18V5l10-2v13" />
+    <circle cx="6" cy="18" r="3" fill="currentColor" stroke="none" />
+    <circle cx="16" cy="16" r="3" fill="currentColor" stroke="none" />
+  </svg>
+);
+export const IconStopwatch = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2 2M9 2h6M12 5V2" />
+  </svg>
+);

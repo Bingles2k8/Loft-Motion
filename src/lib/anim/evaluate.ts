@@ -8,13 +8,21 @@
  * Everything is a scalar channel, so evaluation is a small, deterministic,
  * frame-accurate function.
  */
-import { ease } from "@/lib/anim/easing";
+import { easeWithBezier, getEasing } from "@/lib/anim/easing";
 import type {
   Animatable,
   Effect,
+  Keyframe,
   Layer,
   Transform,
 } from "@/lib/scene/schema";
+
+/** The effective curve of a keyframe segment: custom bezier overrides the name. */
+export function keyframeBezier(
+  kf: Keyframe,
+): [number, number, number, number] {
+  return kf.bezier ?? getEasing(kf.easing).bezier;
+}
 
 /** Resolve a single animatable scalar channel at time `t` (seconds). */
 export function evalAnimatable(prop: Animatable, t: number): number {
@@ -41,7 +49,7 @@ export function evalAnimatable(prop: Animatable, t: number): number {
   if (span <= 0) return k1.value;
 
   const p = (t - k0.time) / span;
-  const eased = ease(k0.easing, p); // easing belongs to the OUTGOING keyframe
+  const eased = easeWithBezier(keyframeBezier(k0), p); // easing belongs to the OUTGOING keyframe
   return k0.value + (k1.value - k0.value) * eased;
 }
 

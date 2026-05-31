@@ -43,13 +43,18 @@ export type EasingName = (typeof EASING_NAMES)[number];
 /**
  * A single keyframe on a scalar channel.
  * `time` is in seconds (composition-relative). `easing` names the curve used to
- * interpolate FROM this keyframe TO the next one.
+ * interpolate FROM this keyframe TO the next one. `bezier`, when present, is a
+ * custom cubic-bezier [x1,y1,x2,y2] that OVERRIDES the named easing — this is
+ * what the Graph Editor writes when a user reshapes a curve by hand.
  */
 export const zKeyframe = z.object({
   id: z.string(),
   time: z.number().min(0),
   value: z.number(),
   easing: zEasingName,
+  bezier: z
+    .tuple([z.number(), z.number(), z.number(), z.number()])
+    .optional(),
 });
 export type Keyframe = z.infer<typeof zKeyframe>;
 
@@ -148,6 +153,8 @@ export const zTextPayload = z.object({
 export type TextPayload = z.infer<typeof zTextPayload>;
 
 export const zImagePayload = z.object({
+  /** Reference to a project asset (preferred), or an inline data URL. */
+  assetId: z.string().optional(),
   /** Data URL kept inline so the document stays self-contained / client-side. */
   src: z.string(),
   naturalWidth: z.number(),
@@ -212,14 +219,41 @@ export const zComposition = z.object({
 });
 export type Composition = z.infer<typeof zComposition>;
 
-export const SCENE_VERSION = 1 as const;
+/* -------------------------------------------------------------------------- */
+/*  Project assets (the Project panel)                                         */
+/* -------------------------------------------------------------------------- */
+
+export const ASSET_TYPES = ["image", "video", "audio"] as const;
+export type AssetType = (typeof ASSET_TYPES)[number];
+
+/**
+ * A user-supplied file, stored entirely client-side as a data URL. Nothing is
+ * ever uploaded — all processing happens in the browser.
+ */
+export const zAsset = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(ASSET_TYPES),
+  src: z.string(), // data URL
+  width: z.number().default(0),
+  height: z.number().default(0),
+  /** Bytes, for the Project panel size column. */
+  size: z.number().default(0),
+  /** Seconds, for video/audio. */
+  duration: z.number().optional(),
+});
+export type Asset = z.infer<typeof zAsset>;
+
+export const SCENE_VERSION = 2 as const;
 
 export const zSceneDocument = z.object({
-  version: z.literal(SCENE_VERSION),
+  // Accept v1 documents too; the loader migrates them.
+  version: z.union([z.literal(1), z.literal(2)]),
   name: z.string().default("Untitled"),
   composition: zComposition,
   /** Render/stacking order is array order: index 0 is the bottom layer. */
   layers: z.array(zLayer).default([]),
+  assets: z.array(zAsset).default([]),
 });
 export type SceneDocument = z.infer<typeof zSceneDocument>;
 

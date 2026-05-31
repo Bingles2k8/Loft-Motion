@@ -5,36 +5,88 @@
  * swapping. Scene mutations go through `update` (records history) or `updateLive`
  * (no history, for drag frames — pair with `beginChange` at gesture start).
  *
- * UI state (selection, playhead, panel toggles) lives here too but is kept out
- * of the history stack.
+ * UI state (selection, playhead, panel sizes, graph mode) lives here too but is
+ * kept out of the history stack.
  */
 "use client";
 
 import { create } from "zustand";
 import {
+  type Asset,
+  type ExportTarget,
   type Keyframe,
   type Layer,
   type SceneDocument,
 } from "@/lib/scene/schema";
 import { sampleScene } from "@/lib/scene/factory";
-import type { ExportTarget } from "@/lib/scene/schema";
 
 const HISTORY_LIMIT = 100;
 
 type Recipe = (scene: SceneDocument) => void;
+
+/** A reference to a single keyframe anywhere in the scene. */
+export interface KfRef {
+  layerId: string;
+  channelPath: string;
+  kfId: string;
+}
+
+export const kfKey = (r: KfRef) => `${r.layerId}|${r.channelPath}|${r.kfId}`;
+
+/** Persisted panel sizes (px) — restored from localStorage on load. */
+export interface PanelSizes {
+  left: number; // Project/Effects column width
+  right: number; // Properties column width
+  bottom: number; // Timeline height
+  timelineLabels: number; // Timeline left label column width
+}
+
+const DEFAULT_SIZES: PanelSizes = {
+  left: 264,
+  right: 320,
+  bottom: 300,
+  timelineLabels: 248,
+};
+
+const SIZES_KEY = "loft.panelSizes.v1";
+
+function loadSizes(): PanelSizes {
+  if (typeof window === "undefined") return DEFAULT_SIZES;
+  try {
+    const raw = window.localStorage.getItem(SIZES_KEY);
+    if (raw) return { ...DEFAULT_SIZES, ...JSON.parse(raw) };
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_SIZES;
+}
+
+export type LeftTab = "project" | "effects";
 
 export interface StoreState {
   scene: SceneDocument;
   past: SceneDocument[];
   future: SceneDocument[];
 
-  // UI state (not in history)
+  // Selection
   selectedLayerId: string | null;
-  selectedKeyframe: { layerId: string; channelPath: string; kfId: string } | null;
+  /** Multi-keyframe selection (graph + dope sheet). */
+  selectedKeys: KfRef[];
+
+  // Playback
   time: number;
   playing: boolean;
   loop: boolean;
-  expanded: Record<string, boolean>; // per-layer deep-timeline toggle
+
+  // Timeline UI
+  expanded: Record<string, boolean>;
+  graphMode: boolean;
+
+  // Layout
+  sizes: PanelSizes;
+  leftTab: LeftTab;
+
+  // Dialogs / side panels
   activeTarget: ExportTarget;
   showPrinciples: boolean;
   showExport: boolean;
@@ -45,13 +97,18 @@ export interface StoreState {
   beginChange: () => void;
   loadScene: (scene: SceneDocument) => void;
 
-  // Layer helpers
+  // Layers
   selectLayer: (id: string | null) => void;
   addLayer: (layer: Layer) => void;
   removeLayer: (id: string) => void;
   duplicateLayer: (id: string) => void;
   reorderLayer: (id: string, toIndex: number) => void;
   updateLayer: (id: string, patch: (layer: Layer) => void, live?: boolean) => void;
+
+  // Assets
+  addAsset: (asset: Asset) => void;
+  removeAsset: (id: string) => void;
+  renameAsset: (id: string, name: string) => void;
 
   // Keyframes
   addKeyframe: (layerId: string, channelPath: string, kf: Keyframe) => void;
@@ -64,9 +121,17 @@ export interface StoreState {
     live?: boolean,
   ) => void;
 
-  selectKeyframe: (
-    sel: { layerId: string; channelPath: string; kfId: string } | null,
-  ) => void;
+  // Keyframe selection
+  selectKeyframe: (ref: KfRef | null, additive?: boolean) => void;
+  selectKeyframes: (refs: KfRef[]) => void;
+  isKeyframeSelected: (ref: KfRef) => boolean;
+  clearKeyframeSelection: () => void;
+
+  // Bulk keyframe ops (operate on the current selection)
+  setEasingForSelection: (easing: string) => void;
+  setBezierForSelection: (bezier: [number, number, number, number]) => void;
+  nudgeSelection: (dtSeconds: number) => void;
+  deleteSelection: () => void;
 
   // Playback / UI
   setTime: (t: number) => void;
@@ -75,6 +140,10 @@ export interface StoreState {
   togglePlay: () => void;
   toggleLoop: () => void;
   toggleExpanded: (id: string) => void;
+  setExpanded: (id: string, v: boolean) => void;
+  toggleGraphMode: () => void;
+  setLeftTab: (t: LeftTab) => void;
+  setPanelSize: (key: keyof PanelSizes, value: number) => void;
   setActiveTarget: (t: ExportTarget) => void;
   setShowPrinciples: (v: boolean) => void;
   setShowExport: (v: boolean) => void;
@@ -89,24 +158,22 @@ const clone = (s: SceneDocument): SceneDocument =>
     ? structuredClone(s)
     : JSON.parse(JSON.stringify(s));
 
-/** Resolve a dotted channel path like "transform.x" or "effects.<id>.params.strength". */
+/** Resolve a dotted channel path to its keyframe array + container node. */
 function resolveChannel(
   layer: Layer,
   path: string,
-): { keyframes: Keyframe[]; container: { value: number; keyframes: Keyframe[] } } | null {
+): { keyframes: Keyframe[] } | null {
   const parts = path.split(".");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let node: any = layer;
   for (const p of parts) {
     if (node == null) return null;
-    if (Array.isArray(node)) {
-      node = node.find((e: { id: string }) => e.id === p);
-    } else {
-      node = node[p];
-    }
+    node = Array.isArray(node)
+      ? node.find((e: { id: string }) => e.id === p)
+      : node[p];
   }
   if (!node || !Array.isArray(node.keyframes)) return null;
-  return { keyframes: node.keyframes, container: node };
+  return { keyframes: node.keyframes };
 }
 
 function sortKeyframes(kfs: Keyframe[]) {
@@ -119,11 +186,18 @@ export const useStore = create<StoreState>((set, get) => ({
   future: [],
 
   selectedLayerId: null,
-  selectedKeyframe: null,
+  selectedKeys: [],
+
   time: 0,
   playing: false,
   loop: true,
+
   expanded: {},
+  graphMode: false,
+
+  sizes: loadSizes(),
+  leftTab: "project",
+
   activeTarget: "mp4",
   showPrinciples: false,
   showExport: false,
@@ -155,11 +229,12 @@ export const useStore = create<StoreState>((set, get) => ({
       past: [],
       future: [],
       selectedLayerId: null,
+      selectedKeys: [],
       time: 0,
       playing: false,
     }),
 
-  selectLayer: (id) => set({ selectedLayerId: id }),
+  selectLayer: (id) => set({ selectedLayerId: id, selectedKeys: [] }),
 
   addLayer: (layer) => {
     get().update((s) => {
@@ -171,7 +246,6 @@ export const useStore = create<StoreState>((set, get) => ({
   removeLayer: (id) => {
     get().update((s) => {
       s.layers = s.layers.filter((l) => l.id !== id);
-      // Orphan any children of a removed group.
       for (const l of s.layers) if (l.parentId === id) l.parentId = null;
     });
     if (get().selectedLayerId === id) set({ selectedLayerId: null });
@@ -204,17 +278,33 @@ export const useStore = create<StoreState>((set, get) => ({
     else get().update(apply);
   },
 
+  addAsset: (asset) =>
+    get().update((s) => {
+      s.assets.push(asset);
+    }),
+
+  removeAsset: (id) =>
+    get().update((s) => {
+      s.assets = s.assets.filter((a) => a.id !== id);
+    }),
+
+  renameAsset: (id, name) =>
+    get().update((s) => {
+      const a = s.assets.find((x) => x.id === id);
+      if (a) a.name = name;
+    }),
+
   addKeyframe: (layerId, channelPath, kf) =>
     get().update((s) => {
       const layer = s.layers.find((l) => l.id === layerId);
       if (!layer) return;
       const ch = resolveChannel(layer, channelPath);
       if (!ch) return;
-      // Replace a keyframe at the same time, otherwise insert + sort.
       const existing = ch.keyframes.find((k) => Math.abs(k.time - kf.time) < 1e-4);
       if (existing) {
         existing.value = kf.value;
         existing.easing = kf.easing;
+        existing.bezier = kf.bezier;
       } else {
         ch.keyframes.push(kf);
         sortKeyframes(ch.keyframes);
@@ -246,7 +336,93 @@ export const useStore = create<StoreState>((set, get) => ({
     else get().update(apply);
   },
 
-  selectKeyframe: (sel) => set({ selectedKeyframe: sel }),
+  selectKeyframe: (ref, additive = false) =>
+    set((state) => {
+      if (!ref) return { selectedKeys: [] };
+      const exists = state.selectedKeys.some((r) => kfKey(r) === kfKey(ref));
+      if (additive) {
+        return {
+          selectedKeys: exists
+            ? state.selectedKeys.filter((r) => kfKey(r) !== kfKey(ref))
+            : [...state.selectedKeys, ref],
+        };
+      }
+      return { selectedKeys: [ref] };
+    }),
+
+  selectKeyframes: (refs) => set({ selectedKeys: refs }),
+
+  isKeyframeSelected: (ref) =>
+    get().selectedKeys.some((r) => kfKey(r) === kfKey(ref)),
+
+  clearKeyframeSelection: () => set({ selectedKeys: [] }),
+
+  setEasingForSelection: (easing) => {
+    const { selectedKeys } = get();
+    if (selectedKeys.length === 0) return;
+    get().update((s) => {
+      for (const ref of selectedKeys) {
+        const layer = s.layers.find((l) => l.id === ref.layerId);
+        if (!layer) continue;
+        const ch = resolveChannel(layer, ref.channelPath);
+        const k = ch?.keyframes.find((kf) => kf.id === ref.kfId);
+        if (k) {
+          k.easing = easing;
+          delete k.bezier; // named easing replaces a custom curve
+        }
+      }
+    });
+  },
+
+  setBezierForSelection: (bezier) => {
+    const { selectedKeys } = get();
+    if (selectedKeys.length === 0) return;
+    get().update((s) => {
+      for (const ref of selectedKeys) {
+        const layer = s.layers.find((l) => l.id === ref.layerId);
+        if (!layer) continue;
+        const ch = resolveChannel(layer, ref.channelPath);
+        const k = ch?.keyframes.find((kf) => kf.id === ref.kfId);
+        if (k) k.bezier = bezier;
+      }
+    });
+  },
+
+  nudgeSelection: (dt) => {
+    const { selectedKeys } = get();
+    if (selectedKeys.length === 0) return;
+    get().update((s) => {
+      const touched = new Set<string>();
+      for (const ref of selectedKeys) {
+        const layer = s.layers.find((l) => l.id === ref.layerId);
+        if (!layer) continue;
+        const ch = resolveChannel(layer, ref.channelPath);
+        const k = ch?.keyframes.find((kf) => kf.id === ref.kfId);
+        if (k) {
+          k.time = Math.max(0, k.time + dt);
+          touched.add(`${ref.layerId}|${ref.channelPath}`);
+        }
+        if (ch) sortKeyframes(ch.keyframes);
+      }
+      void touched;
+    });
+  },
+
+  deleteSelection: () => {
+    const { selectedKeys } = get();
+    if (selectedKeys.length === 0) return;
+    get().update((s) => {
+      for (const ref of selectedKeys) {
+        const layer = s.layers.find((l) => l.id === ref.layerId);
+        if (!layer) continue;
+        const ch = resolveChannel(layer, ref.channelPath);
+        if (!ch) continue;
+        const idx = ch.keyframes.findIndex((k) => k.id === ref.kfId);
+        if (idx >= 0) ch.keyframes.splice(idx, 1);
+      }
+    });
+    set({ selectedKeys: [] });
+  },
 
   setTime: (t) => set({ time: Math.max(0, t) }),
   play: () => set({ playing: true }),
@@ -255,6 +431,24 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleLoop: () => set((s) => ({ loop: !s.loop })),
   toggleExpanded: (id) =>
     set((s) => ({ expanded: { ...s.expanded, [id]: !s.expanded[id] } })),
+  setExpanded: (id, v) =>
+    set((s) => ({ expanded: { ...s.expanded, [id]: v } })),
+  toggleGraphMode: () => set((s) => ({ graphMode: !s.graphMode })),
+  setLeftTab: (t) => set({ leftTab: t }),
+
+  setPanelSize: (key, value) =>
+    set((state) => {
+      const sizes = { ...state.sizes, [key]: value };
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(SIZES_KEY, JSON.stringify(sizes));
+        } catch {
+          /* ignore */
+        }
+      }
+      return { sizes };
+    }),
+
   setActiveTarget: (t) => set({ activeTarget: t }),
   setShowPrinciples: (v) => set({ showPrinciples: v }),
   setShowExport: (v) => set({ showExport: v }),
@@ -267,6 +461,7 @@ export const useStore = create<StoreState>((set, get) => ({
         scene: prev,
         past: state.past.slice(0, -1),
         future: [state.scene, ...state.future].slice(0, HISTORY_LIMIT),
+        selectedKeys: [],
       };
     }),
 
@@ -278,6 +473,7 @@ export const useStore = create<StoreState>((set, get) => ({
         scene: next,
         past: [...state.past, state.scene].slice(-HISTORY_LIMIT),
         future: state.future.slice(1),
+        selectedKeys: [],
       };
     }),
 }));

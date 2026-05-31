@@ -3,24 +3,65 @@
 import { useEffect, useRef, useState } from "react";
 import { SceneRenderer } from "@/lib/render/renderer";
 import { useStore } from "@/lib/store/useStore";
+import {
+  classifyFile,
+  readAssetFile,
+} from "@/lib/io/file";
+import {
+  createAsset,
+  createImageLayerFromAsset,
+} from "@/lib/scene/factory";
 
 /**
  * The canvas surface. Owns a single SceneRenderer instance and drives it from
  * the store: structural scene changes call `setScene`, and the playhead time
  * calls `renderAt`. The canvas keeps the composition's native resolution and is
- * scaled with CSS to fit the viewport.
+ * scaled with CSS to fit the viewport. Accepts image drag-and-drop (from the OS
+ * or the Project panel) and adds it as a layer — all in-browser, never uploaded.
  */
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<SceneRenderer | null>(null);
   const [ready, setReady] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const scene = useStore((s) => s.scene);
   const time = useStore((s) => s.time);
   const compW = scene.composition.width;
   const compH = scene.composition.height;
   const compBg = scene.composition.background;
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const store = useStore.getState();
+
+    // Asset dragged from the Project panel.
+    const assetId = e.dataTransfer.getData("application/x-loft-asset");
+    if (assetId) {
+      const asset = store.scene.assets.find((a) => a.id === assetId);
+      if (asset && asset.type === "image") {
+        store.addLayer(createImageLayerFromAsset(asset, store.scene.composition));
+      }
+      return;
+    }
+
+    // Files dropped from the OS.
+    for (const file of Array.from(e.dataTransfer.files)) {
+      if (classifyFile(file) !== "image") continue;
+      const r = await readAssetFile(file);
+      const asset = createAsset("image", r.name, r.src, {
+        width: r.width,
+        height: r.height,
+        size: r.size,
+      });
+      store.addAsset(asset);
+      store.addLayer(
+        createImageLayerFromAsset(asset, store.scene.composition),
+      );
+    }
+  };
 
   // Create the renderer once.
   useEffect(() => {
@@ -82,20 +123,29 @@ export function Stage() {
     <div
       ref={wrapRef}
       className="relative flex flex-1 items-center justify-center overflow-hidden bg-ink-950"
-      style={{
-        backgroundImage:
-          "radial-gradient(circle at 50% 40%, rgba(124,92,255,0.06), transparent 60%)",
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
       }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
     >
       <div
-        className="rounded-md shadow-2xl shadow-black/60 ring-1 ring-white/5"
+        className="shadow-2xl shadow-black/50 ring-1 ring-black/40"
         style={{ background: compBg }}
       >
-        <canvas ref={canvasRef} className="block rounded-md" />
+        <canvas ref={canvasRef} className="block" />
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-4 text-[11px] font-medium text-haze-400">
+      <div className="pointer-events-none absolute bottom-3 left-4 text-[11px] font-medium text-haze-500">
         {compW} × {compH} · {scene.composition.fps}fps · {scene.composition.duration}s
       </div>
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded border-2 border-dashed border-brand-400/70 bg-brand-500/10">
+          <span className="text-sm font-semibold text-brand-300">
+            Drop image to add a layer
+          </span>
+        </div>
+      )}
     </div>
   );
 }

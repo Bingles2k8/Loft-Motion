@@ -139,21 +139,43 @@ function solveT(x: number, x1: number, x2: number) {
 }
 
 /**
- * Sample a named easing at normalised progress `p` in [0,1].
- * Returns the eased value (which can exceed [0,1] for overshoot/anticipate).
+ * Sample a cubic-bezier curve (given its 4 control points) at progress `p`.
+ * Returns the eased value (can exceed [0,1] for overshoot/anticipate).
  */
-export function ease(name: string, p: number): number {
+export function easeWithBezier(
+  bezier: readonly [number, number, number, number],
+  p: number,
+): number {
   if (p <= 0) return 0;
   if (p >= 1) return 1;
-  const [x1, y1, x2, y2] = getEasing(name).bezier;
+  const [x1, y1, x2, y2] = bezier;
   if (x1 === 0 && y1 === 0 && x2 === 1 && y2 === 1) return p; // linear fast-path
   const t = solveT(p, x1, x2);
   return calcBezier(t, y1, y2);
 }
 
-/** CSS representation, e.g. `cubic-bezier(0.16, 1, 0.3, 1)`. */
+/**
+ * Sample a named easing at normalised progress `p` in [0,1].
+ */
+export function ease(name: string, p: number): number {
+  return easeWithBezier(getEasing(name).bezier, p);
+}
+
+/** CSS representation of a raw bezier, e.g. `cubic-bezier(0.16, 1, 0.3, 1)`. */
+export function bezierToCss(
+  bezier: readonly [number, number, number, number],
+): string {
+  const [x1, y1, x2, y2] = bezier;
+  if (x1 === 0 && y1 === 0 && x2 === 1 && y2 === 1) return "linear";
+  return `cubic-bezier(${round(x1)}, ${round(y1)}, ${round(x2)}, ${round(y2)})`;
+}
+
+/** CSS representation of a named easing. */
 export function easingToCss(name: string): string {
   if (name === "linear") return "linear";
-  const [x1, y1, x2, y2] = getEasing(name).bezier;
-  return `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})`;
+  return bezierToCss(getEasing(name).bezier);
+}
+
+function round(v: number) {
+  return Math.round(v * 1000) / 1000;
 }

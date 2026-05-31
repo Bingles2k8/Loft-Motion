@@ -1,21 +1,41 @@
 @import "tailwindcss";
 
-/* Loft Motion design tokens — a calm, dark studio palette. */
+/*
+ * Loft Motion design system — a neutral, professional dark-grey studio theme
+ * modelled on After Effects. No gradients, no purple/blue washes: just a clean
+ * grey scale with a single restrained steel-blue accent used sparingly for
+ * selection and active states.
+ */
 @theme {
-  --color-ink-950: #08080d;
-  --color-ink-900: #0b0b12;
-  --color-ink-850: #101019;
-  --color-ink-800: #15151f;
-  --color-ink-700: #1d1d2b;
-  --color-ink-600: #2a2a3d;
-  --color-ink-500: #3a3a52;
-  --color-haze-400: #8a8aa8;
-  --color-haze-300: #a7a7c4;
-  --color-brand-500: #7c5cff;
-  --color-brand-400: #957bff;
-  --color-brand-300: #b3a1ff;
-  --color-mint-400: #5ce1ff;
-  --color-rose-400: #ff5c9d;
+  /* Neutral grey scale modelled on After Effects / Adobe Spectrum dark. */
+  --color-ink-950: #0f0f0f; /* seams between panels, viewer void */
+  --color-ink-900: #1b1b1b; /* app background */
+  --color-ink-850: #212121; /* panel background */
+  --color-ink-800: #262626; /* panel body / sub-surface */
+  --color-ink-750: #2b2b2b; /* header strips, column headers */
+  --color-ink-700: #323232; /* rows, inputs at rest */
+  --color-ink-650: #383838; /* raised control face */
+  --color-ink-600: #444444; /* control hover / borders */
+  --color-ink-500: #545454; /* raised borders, handles */
+
+  /* Text greys */
+  --color-haze-200: #e8e8e8;
+  --color-haze-300: #b6b6b6;
+  --color-haze-400: #8c8c8c;
+  --color-haze-500: #6e6e6e;
+
+  /* Single accent — AE's desaturated steel blue (selection / CTI). */
+  --color-brand-600: #2d6cb4;
+  --color-brand-500: #3a7cc0;
+  --color-brand-400: #4f8fcb;
+  --color-brand-300: #79aede;
+  --color-brand-tint: #2c3a47; /* blue-tinted selected-row fill */
+
+  /* Content/status colors (muted, semantic). */
+  --color-mint-400: #58c8d6;
+  --color-rose-400: #d96a8f;
+  --color-amber-400: #d6a14f;
+  --color-emerald-400: #5cb88a;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
@@ -27,33 +47,65 @@ body {
 
 body {
   background: var(--color-ink-900);
-  color: #e9e9f3;
+  color: var(--color-haze-200);
   font-family: var(--font-sans);
+  font-size: 13px;
   overscroll-behavior: none;
+  /* Default to the arrow cursor everywhere; opt-in to others below. */
+  cursor: default;
 }
 
-/* Thin, unobtrusive scrollbars to match the studio feel. */
+/* Clickable affordances get the pointer; text fields keep the I-beam. */
+button,
+[role="button"],
+summary,
+label > input[type="checkbox"],
+select {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+input[type="text"],
+input[type="number"],
+textarea {
+  cursor: text;
+}
+
+/* Anything draggable should never show a text caret or select text. */
+.lm-noselect {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Thin AE-style scrollbars. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-ink-600) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-thumb {
   background: var(--color-ink-600);
-  border-radius: 8px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-500);
+  background-clip: padding-box;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* Range inputs styled as slim sliders. */
+/* Slim slider inputs. */
 input[type="range"].lm-slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
   background: var(--color-ink-600);
   outline: none;
@@ -61,20 +113,43 @@ input[type="range"].lm-slider {
 input[type="range"].lm-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--color-brand-400);
+  background: var(--color-haze-300);
   cursor: pointer;
-  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
 }
 input[type="range"].lm-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border: none;
   border-radius: 50%;
-  background: var(--color-brand-400);
+  background: var(--color-haze-300);
   cursor: pointer;
+}
+
+/* Number inputs: hide spinners for a cleaner look (we scrub instead). */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Resize cursors applied to splitter handles. */
+.lm-resize-x {
+  cursor: col-resize;
+}
+.lm-resize-y {
+  cursor: row-resize;
+}
+
+/* Scrubbable numeric labels (drag left/right to change value). */
+.lm-scrub {
+  cursor: ew-resize;
 }
 
 @keyframes lm-spin {

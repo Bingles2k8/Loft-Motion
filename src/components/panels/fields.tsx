@@ -12,14 +12,14 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-b border-ink-700 px-3 py-3">
+    <div className="border-b border-ink-700 px-3 py-2.5">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-haze-400">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-haze-500">
           {title}
         </h3>
         {right}
       </div>
-      <div className="space-y-2">{children}</div>
+      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }
@@ -54,16 +54,43 @@ export function NumberInput({
 }) {
   const [draft, setDraft] = useState(String(round(value)));
   const [editing, setEditing] = useState(false);
+  const clampN = (n: number) => {
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    return n;
+  };
   useEffect(() => {
     if (!editing) setDraft(String(round(value)));
   }, [value, editing]);
 
   const commit = (raw: string, live: boolean) => {
-    let n = Number.parseFloat(raw);
+    const n = Number.parseFloat(raw);
     if (Number.isNaN(n)) return;
-    if (min !== undefined) n = Math.max(min, n);
-    if (max !== undefined) n = Math.min(max, n);
-    onChange(n, live);
+    onChange(clampN(n), live);
+  };
+
+  // AE-style scrubbing: drag the value horizontally to change it.
+  const onScrubDown = (e: React.PointerEvent) => {
+    if (editing) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startVal = value;
+    const perPx = (step || 1) * (e.shiftKey ? 0.1 : 1);
+    onCommitStart?.();
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      moved = true;
+      const next = clampN(startVal + (ev.clientX - startX) * perPx);
+      setDraft(String(round(next)));
+      onChange(next, true);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      if (moved) onChange(clampN(value), false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   };
 
   return (
@@ -87,7 +114,13 @@ export function NumberInput({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
-        className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-white tabular-nums focus:border-brand-400 focus:outline-none"
+        className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 tabular-nums focus:border-brand-400 focus:outline-none"
+      />
+      {/* Scrub strip: a thin grab zone on the left edge of the field. */}
+      <div
+        onPointerDown={onScrubDown}
+        title="Drag to scrub (Shift for fine)"
+        className="lm-scrub absolute inset-y-0 left-0 w-3"
       />
       {suffix && (
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-haze-500">
@@ -107,7 +140,7 @@ export function ColorInput({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <label className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md ring-1 ring-ink-600">
+      <label className="relative h-6 w-6 shrink-0 overflow-hidden rounded ring-1 ring-ink-600">
         <span
           className="absolute inset-0"
           style={{ background: value }}
@@ -122,7 +155,7 @@ export function ColorInput({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-white focus:border-brand-400 focus:outline-none"
+        className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
       />
     </div>
   );
@@ -141,7 +174,7 @@ export function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="flex-1 rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-white focus:border-brand-400 focus:outline-none"
+      className="flex-1 rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -163,7 +196,7 @@ export function TextInput({
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-white focus:border-brand-400 focus:outline-none"
+      className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
     />
   );
 }
