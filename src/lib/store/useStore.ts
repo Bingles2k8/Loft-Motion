@@ -104,6 +104,7 @@ export interface StoreState {
   /** Per-layer channel solo: when non-empty, only these channel paths show. */
   soloChannels: Record<string, string[]>;
   autoKeyframe: boolean;
+  showSafeZones: boolean;
 
   // Viewport (comp view transform — does not touch layer values)
   viewZoom: number; // 0 = fit-to-window (auto)
@@ -220,6 +221,7 @@ export interface StoreState {
   toggleSoloChannel: (layerId: string, channelPath: string) => void;
   clearSoloChannels: (layerId: string) => void;
   setAutoKeyframe: (v: boolean) => void;
+  setShowSafeZones: (v: boolean) => void;
 
   // Viewport
   setView: (z: number, panX: number, panY: number) => void;
@@ -273,6 +275,7 @@ export const useStore = create<StoreState>((set, get) => ({
   graphMode: false,
   soloChannels: {},
   autoKeyframe: false,
+  showSafeZones: false,
 
   viewZoom: 0,
   viewPanX: 0,
@@ -691,6 +694,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
 
   setAutoKeyframe: (v) => set({ autoKeyframe: v }),
+  setShowSafeZones: (v) => set({ showSafeZones: v }),
 
   setView: (z, panX, panY) => set({ viewZoom: z, viewPanX: panX, viewPanY: panY }),
   resetView: () => set({ viewZoom: 0, viewPanX: 0, viewPanY: 0 }),

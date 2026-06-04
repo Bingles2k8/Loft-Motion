@@ -32,6 +32,7 @@ export function Stage() {
 
   const scene = useStore((s) => s.scene);
   const time = useStore((s) => s.time);
+  const showSafeZones = useStore((s) => s.showSafeZones);
   const compW = scene.composition.width;
   const compH = scene.composition.height;
   const compBg = scene.composition.background;
@@ -149,6 +150,14 @@ export function Stage() {
         <canvas ref={canvasRef} className="block" />
       </div>
       {ready && <ViewportOverlay view={view} wrapRef={wrapRef} />}
+      {showSafeZones && (
+        <SafeZones
+          left={view.offsetX}
+          top={view.offsetY}
+          width={compW * view.scale}
+          height={compH * view.scale}
+        />
+      )}
       {dragOver && (
         <div className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded border-2 border-dashed border-brand-400/70 bg-brand-500/10">
           <span className="text-sm font-semibold text-brand-300">
@@ -156,6 +165,45 @@ export function Stage() {
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Title/action-safe guides for social formats: a 90% action-safe box and an 80%
+ * title-safe box, plus centre crosshair lines — so creators keep key content
+ * away from platform UI overlays.
+ */
+function SafeZones({
+  left,
+  top,
+  width,
+  height,
+}: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}) {
+  const inset = (pct: number) => ({
+    left: left + (width * (1 - pct)) / 2,
+    top: top + (height * (1 - pct)) / 2,
+    width: width * pct,
+    height: height * pct,
+  });
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20">
+      <div className="absolute border border-amber-400/40" style={inset(0.9)} />
+      <div className="absolute border border-amber-400/25" style={inset(0.8)} />
+      {/* centre lines */}
+      <div
+        className="absolute bg-amber-400/20"
+        style={{ left: left + width / 2, top, width: 1, height }}
+      />
+      <div
+        className="absolute bg-amber-400/20"
+        style={{ left, top: top + height / 2, width, height: 1 }}
+      />
     </div>
   );
 }

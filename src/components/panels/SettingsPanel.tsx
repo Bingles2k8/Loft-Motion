@@ -29,6 +29,8 @@ export function SettingsPanel() {
   const toggleLoop = useStore((s) => s.toggleLoop);
   const autoKeyframe = useStore((s) => s.autoKeyframe);
   const setAutoKeyframe = useStore((s) => s.setAutoKeyframe);
+  const showSafeZones = useStore((s) => s.showSafeZones);
+  const setShowSafeZones = useStore((s) => s.setShowSafeZones);
 
   if (!show) return null;
   const c = scene.composition;
@@ -152,6 +154,12 @@ export function SettingsPanel() {
               hint="Transforming a layer writes keyframes at the playhead."
               value={autoKeyframe}
               onChange={() => setAutoKeyframe(!autoKeyframe)}
+            />
+            <Toggle
+              label="Safe zones"
+              hint="Title/action-safe guides for social formats."
+              value={showSafeZones}
+              onChange={() => setShowSafeZones(!showSafeZones)}
             />
           </Section>
 

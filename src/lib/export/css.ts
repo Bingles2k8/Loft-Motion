@@ -181,10 +181,17 @@ export function exportCss(rawScene: SceneDocument): CssExport {
       : "") +
     ` */`;
 
+  // Accessibility: honour reduced-motion by freezing animations on their last
+  // frame so motion-sensitive users still see the final composition.
+  const reducedMotion = `@media (prefers-reduced-motion: reduce){
+  .lm-stage *{animation-duration:0.001ms !important;animation-iteration-count:1 !important;animation-delay:0ms !important;}
+}`;
+
   const css = `${header}
 .lm-stage{position:relative;width:${comp.width}px;height:${comp.height}px;background:${comp.background};overflow:hidden}
 .lm-stage>div{position:absolute;left:0;top:0}
-${rules}`;
+${rules}
+${reducedMotion}`;
 
   const html = `<div class="lm-stage">\n${body}\n</div>`;
 
