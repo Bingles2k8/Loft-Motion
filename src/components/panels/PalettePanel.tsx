@@ -105,7 +105,66 @@ export function PalettePanel() {
             ))}
           </div>
         </div>
+
+        <BrandKit />
       </div>
+    </div>
+  );
+}
+
+const BRAND_KEY = "loft.brandKit.v1";
+
+/**
+ * Brand kit — persist the current palette to localStorage and re-apply it to
+ * any future project in one click. (Local-first: nothing leaves the device.)
+ */
+function BrandKit() {
+  const swatches = useStore((s) => s.scene.palette.swatches);
+  const addSwatch = useStore((s) => s.addSwatch);
+  const removeSwatch = useStore((s) => s.removeSwatch);
+
+  const save = () => {
+    try {
+      window.localStorage.setItem(BRAND_KEY, JSON.stringify(swatches));
+    } catch {
+      /* ignore */
+    }
+  };
+  const apply = () => {
+    try {
+      const raw = window.localStorage.getItem(BRAND_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Swatch[];
+      // Replace current swatches with the brand kit.
+      for (const s of [...swatches]) removeSwatch(s.id);
+      for (const s of saved) addSwatch({ id: uid("sw"), name: s.name, color: s.color });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className="border-t border-ink-700 p-2">
+      <h3 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-haze-500">
+        Brand kit
+      </h3>
+      <div className="flex gap-1">
+        <button
+          onClick={save}
+          className="flex-1 rounded bg-ink-700 px-2 py-1.5 text-[11px] text-haze-200 transition hover:bg-ink-600"
+        >
+          Save current
+        </button>
+        <button
+          onClick={apply}
+          className="flex-1 rounded bg-ink-700 px-2 py-1.5 text-[11px] text-haze-200 transition hover:bg-ink-600"
+        >
+          Apply to project
+        </button>
+      </div>
+      <p className="mt-1.5 px-1 text-[10px] leading-relaxed text-haze-500">
+        Saves this palette on your device, ready to drop into any project.
+      </p>
     </div>
   );
 }

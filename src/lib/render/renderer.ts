@@ -63,6 +63,7 @@ import {
   evalTransform,
   isLayerActive,
 } from "@/lib/anim/evaluate";
+import { easeWithBezier } from "@/lib/anim/easing";
 import {
   resolveColor,
   type Effect,
@@ -265,18 +266,37 @@ export class SceneRenderer {
       width = layer.shape.width;
       height = layer.shape.height;
     } else if (layer.type === "text" && layer.text) {
+      const t = layer.text;
       const style = new TextStyle({
-        fontFamily: layer.text.fontFamily,
-        fontSize: layer.text.fontSize,
-        fontWeight: String(layer.text.fontWeight) as TextStyle["fontWeight"],
-        fill: resolved(layer.text.fill, this.scene),
-        align: layer.text.align,
-        letterSpacing: layer.text.letterSpacing,
+        fontFamily: t.fontFamily,
+        fontSize: t.fontSize,
+        fontWeight: String(t.fontWeight) as TextStyle["fontWeight"],
+        fill: resolved(t.fill, this.scene),
+        align: t.align,
+        letterSpacing: t.letterSpacing,
       });
-      const text = new Text({ text: layer.text.content, style });
-      display = text;
-      width = text.width;
-      height = text.height;
+      const animated = t.animator && t.animator.kind !== "none";
+      if (animated && !t.counter?.enabled) {
+        // Lay out per-unit Text children so each can animate independently.
+        const holder = new Container();
+        const units = splitUnits(t.content, t.animator!.unit);
+        let x = 0;
+        for (const u of units) {
+          const seg = new Text({ text: u.text, style });
+          seg.position.set(x, 0);
+          (seg as unknown as { _unitIndex: number })._unitIndex = u.index;
+          holder.addChild(seg);
+          x += seg.width;
+        }
+        display = holder;
+        width = x;
+        height = holder.height || t.fontSize;
+      } else {
+        const text = new Text({ text: t.content, style });
+        display = text;
+        width = text.width;
+        height = text.height;
+      }
     } else if (layer.type === "image" && layer.image) {
       const sprite = new Sprite(Texture.EMPTY);
       const w0 = layer.image.naturalWidth;
@@ -722,10 +742,42 @@ export class SceneRenderer {
         if (cn.trimStroke && layer.shape) {
           this.updateTrimStroke(cn, layer.shape, t);
         }
+
+        // Kinetic typography + number counter.
+        if (layer.type === "text" && layer.text) {
+          this.updateText(cn, layer.text, t);
+        }
       }
     }
 
     this.app.renderer.render(this.app.stage);
+  }
+
+  /** Per-frame text updates: counter string + per-unit kinetic animation. */
+  private updateText(cn: CloneNode, text: NonNullable<Layer["text"]>, t: number) {
+    // Counter mode: rewrite the single Text's string each frame.
+    if (text.counter?.enabled && cn.display instanceof Text) {
+      const c = text.counter;
+      const dur = this.scene.composition.duration || 1;
+      const p = Math.max(0, Math.min(1, t / dur));
+      const eased = p * p * (3 - 2 * p); // smoothstep
+      const val = c.from + (c.to - c.from) * eased;
+      cn.display.text = formatCounter(val, c);
+      return;
+    }
+    // Kinetic typography: animate each per-unit child.
+    const a = text.animator;
+    if (!a || a.kind === "none") return;
+    const children = (cn.display as Container).children as unknown as Array<
+      Container & { _unitIndex?: number }
+    >;
+    for (const seg of children) {
+      const idx = seg._unitIndex ?? 0;
+      const local = t - a.start - idx * a.stagger;
+      const p = Math.max(0, Math.min(1, local / Math.max(0.001, a.duration)));
+      const e = easeWithBezier([0.16, 1, 0.3, 1], p); // settle
+      applyTextUnit(seg, a.kind, e, text.fontSize);
+    }
   }
 
   resizeView(displayWidth: number, displayHeight: number) {
@@ -921,4 +973,75 @@ function makeGradient(
     ],
     textureSpace: "local",
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Text helpers (kinetic typography + number counter)                         */
+/* -------------------------------------------------------------------------- */
+
+/** Split text into animation units (characters / words / lines) with indices. */
+export function splitUnits(
+  content: string,
+  unit: "character" | "word" | "line",
+): Array<{ text: string; index: number }> {
+  if (unit === "line") {
+    return content.split("\n").map((text, index) => ({ text, index }));
+  }
+  if (unit === "word") {
+    // Keep trailing spaces with each word so spacing is preserved.
+    const parts = content.match(/\S+\s*/g) ?? [content];
+    return parts.map((text, index) => ({ text, index }));
+  }
+  return Array.from(content).map((text, index) => ({ text, index }));
+}
+
+/** Format a counter value with optional thousands separator + affixes. */
+export function formatCounter(
+  value: number,
+  o: { decimals: number; prefix: string; suffix: string; separator: boolean },
+): string {
+  const fixed = value.toFixed(Math.max(0, o.decimals));
+  const out = o.separator
+    ? fixed.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : fixed;
+  return `${o.prefix}${out}${o.suffix}`;
+}
+
+/** Apply a kinetic-typography unit transform at eased progress e in [0,1]. */
+function applyTextUnit(
+  seg: Container & { _baseX?: number; _baseY?: number },
+  kind: string,
+  e: number,
+  fontSize: number,
+) {
+  // Cache the layout baseline position once.
+  if (seg._baseX === undefined) {
+    seg._baseX = seg.position.x;
+    seg._baseY = seg.position.y;
+  }
+  const bx = seg._baseX;
+  const by = seg._baseY ?? 0;
+  seg.alpha = 1;
+  seg.position.set(bx, by);
+  seg.scale.set(1, 1);
+  switch (kind) {
+    case "fade-up":
+      seg.alpha = e;
+      seg.position.set(bx, by + (1 - e) * fontSize * 0.6);
+      break;
+    case "fade-in":
+      seg.alpha = e;
+      break;
+    case "scale-in":
+      seg.alpha = e;
+      seg.scale.set(e, e);
+      break;
+    case "typewriter":
+      // Hard on/off reveal per unit.
+      seg.alpha = e > 0 ? 1 : 0;
+      break;
+    case "wave":
+      seg.position.set(bx, by + Math.sin(e * Math.PI) * -fontSize * 0.4);
+      break;
+  }
 }

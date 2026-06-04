@@ -191,6 +191,33 @@ export const zShapePayload = z.object({
 export type ShapePayload = z.infer<typeof zShapePayload>;
 
 export const TEXT_ALIGN = ["left", "center", "right"] as const;
+
+/** Kinetic typography: animate per character / word / line over a window. */
+export const TEXT_ANIM_KINDS = [
+  "none",
+  "fade-up",
+  "fade-in",
+  "scale-in",
+  "typewriter",
+  "wave",
+] as const;
+export type TextAnimKind = (typeof TEXT_ANIM_KINDS)[number];
+
+export const TEXT_ANIM_UNITS = ["character", "word", "line"] as const;
+export type TextAnimUnit = (typeof TEXT_ANIM_UNITS)[number];
+
+export const zTextAnimator = z.object({
+  kind: z.enum(TEXT_ANIM_KINDS).default("none"),
+  unit: z.enum(TEXT_ANIM_UNITS).default("character"),
+  /** Per-unit stagger in seconds. */
+  stagger: z.number().default(0.04),
+  /** Duration of each unit's move. */
+  duration: z.number().default(0.5),
+  /** Start time of the whole sweep. */
+  start: z.number().default(0),
+});
+export type TextAnimator = z.infer<typeof zTextAnimator>;
+
 export const zTextPayload = z.object({
   content: z.string(),
   fontSize: z.number().min(1),
@@ -199,6 +226,20 @@ export const zTextPayload = z.object({
   align: z.enum(TEXT_ALIGN).default("left"),
   fill: z.string(),
   letterSpacing: z.number().default(0),
+  /** Kinetic typography animator (optional). */
+  animator: zTextAnimator.optional(),
+  /** Number-counter mode: render an animated count instead of static content. */
+  counter: z
+    .object({
+      enabled: z.boolean().default(false),
+      from: z.number().default(0),
+      to: z.number().default(100),
+      decimals: z.number().int().default(0),
+      prefix: z.string().default(""),
+      suffix: z.string().default(""),
+      separator: z.boolean().default(true), // thousands separator
+    })
+    .optional(),
 });
 export type TextPayload = z.infer<typeof zTextPayload>;
 

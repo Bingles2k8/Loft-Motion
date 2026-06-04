@@ -302,6 +302,97 @@ const EXAMPLES: ExampleProject[] = [
       return doc("Draw-On Lines", [ring]);
     },
   },
+  {
+    id: "kinetic-headline",
+    name: "Kinetic Headline",
+    blurb: "Caption-style text that reveals word by word.",
+    tools: ["Kinetic typography", "Text"],
+    build: () => {
+      const t = createTextLayer({ name: "Headline", x: 960, y: 540 });
+      t.text = {
+        ...t.text!,
+        content: "Make it move",
+        fontSize: 150,
+        fontWeight: 800,
+        fill: "#f2f2f2",
+        animator: { kind: "fade-up", unit: "word", stagger: 0.12, duration: 0.6, start: 0.1 },
+      };
+      return doc("Kinetic Headline", [t]);
+    },
+  },
+  {
+    id: "stat-counter",
+    name: "Stat Counter",
+    blurb: "An animated number counting up — perfect for stats.",
+    tools: ["Number counter", "Text"],
+    build: () => {
+      const t = createTextLayer({ name: "Stat", x: 960, y: 540 });
+      t.text = {
+        ...t.text!,
+        content: "0",
+        fontSize: 220,
+        fontWeight: 800,
+        fill: "#5ce1ff",
+        counter: { enabled: true, from: 0, to: 12500, decimals: 0, prefix: "", suffix: "+", separator: true },
+      };
+      return doc("Stat Counter", [t]);
+    },
+  },
+  {
+    id: "toggle-micro",
+    name: "Toggle (micro-interaction)",
+    blurb: "A pill toggle with a springy knob — UI micro-interaction.",
+    tools: ["Spring", "Micro-interaction"],
+    build: () => {
+      const track = createShapeLayer("rect", { name: "Track", x: 960, y: 540 });
+      track.shape = { ...track.shape!, width: 260, height: 110, cornerRadius: 55, fill: { color: "#4f8fcb" } };
+      const knob = createShapeLayer("ellipse", { name: "Knob", x: 870, y: 540 });
+      knob.shape = { ...knob.shape!, width: 84, height: 84, fill: { color: "#ffffff" } };
+      knob.transform.x = {
+        value: 1050,
+        keyframes: [
+          { id: uid("kf"), time: 0.3, value: 870, easing: "overshoot" },
+          { id: uid("kf"), time: 1.0, value: 1050, easing: "overshoot" },
+        ],
+      };
+      return doc("Toggle", [track, knob]);
+    },
+  },
+  {
+    id: "logo-reveal",
+    name: "Logo Reveal",
+    blurb: "A draw-on ring + pop-in mark — drop your logo in.",
+    tools: ["Trim Paths", "Spring", "Logo"],
+    build: () => {
+      const ring = createShapeLayer("ellipse", { name: "Ring", x: 960, y: 540 });
+      ring.shape = {
+        ...ring.shape!,
+        width: 300, height: 300,
+        fill: { color: "#0e0e12" },
+        stroke: { color: "#5ce1ff", width: 8, cap: "round" },
+        trim: {
+          enabled: true,
+          start: { value: 0, keyframes: [] },
+          end: { value: 100, keyframes: [
+            { id: uid("kf"), time: 0, value: 0, easing: "settle" },
+            { id: uid("kf"), time: 1.2, value: 100, easing: "settle" },
+          ] },
+          offset: { value: -90, keyframes: [] },
+        },
+      };
+      const mark = createTextLayer({ name: "Mark", x: 960, y: 560 });
+      mark.text = { ...mark.text!, content: "LM", fontSize: 120, fontWeight: 800, fill: "#f2f2f2" };
+      mark.transform.scaleX = { value: 100, keyframes: [
+        { id: uid("kf"), time: 0.8, value: 0, easing: "overshoot" },
+        { id: uid("kf"), time: 1.5, value: 100, easing: "overshoot" },
+      ] };
+      mark.transform.scaleY = { value: 100, keyframes: [
+        { id: uid("kf"), time: 0.8, value: 0, easing: "overshoot" },
+        { id: uid("kf"), time: 1.5, value: 100, easing: "overshoot" },
+      ] };
+      return doc("Logo Reveal", [ring, mark]);
+    },
+  },
 ];
 
 export const EXAMPLE_PROJECTS = EXAMPLES;

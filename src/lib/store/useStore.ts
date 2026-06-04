@@ -29,6 +29,7 @@ import {
   type DistributeOp,
 } from "@/lib/scene/align";
 import { applyAutoAnimate, type AutoAnimatePreset } from "@/lib/anim/autoAnimate";
+import { applyMagic } from "@/lib/anim/magic";
 import { layerSize } from "@/lib/render/viewport";
 
 /** Half-extents of a layer's box at its current static scale (comp px). */
@@ -43,6 +44,10 @@ function layerHalfExtents(l: Layer): { w: number; h: number } {
 const HISTORY_LIMIT = 100;
 
 type Recipe = (scene: SceneDocument) => void;
+
+/** In-memory animation clipboard (transform keyframes + behaviors + cloner). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let animClipboard: any = null;
 
 /** A reference to a single keyframe anywhere in the scene. */
 export interface KfRef {
@@ -175,6 +180,13 @@ export interface StoreState {
     preset: AutoAnimatePreset,
     mode: "in" | "out" | "both",
   ) => void;
+  /** One-click tasteful animation; `surprise` re-rolls a fresh variation. */
+  magicAnimate: (id: string, surprise: boolean) => void;
+  /** Copy the selected layer's full animation (keyframes + behaviors). */
+  copyAnimation: () => void;
+  /** Paste the clipboard animation onto the selected layer. */
+  pasteAnimation: () => void;
+  hasClipboard: () => boolean;
 
   // Keyframes
   addKeyframe: (layerId: string, channelPath: string, kf: Keyframe) => void;
@@ -511,6 +523,42 @@ export const useStore = create<StoreState>((set, get) => ({
       const l = s.layers.find((x) => x.id === id);
       if (l) applyAutoAnimate(l, preset, s.composition, { mode });
     }),
+
+  magicAnimate: (id, surprise) =>
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === id);
+      if (l) applyMagic(l, s.composition, surprise ? (Math.random() * 1e9) | 0 : 1234);
+    }),
+
+  copyAnimation: () => {
+    const { selectedLayerId, scene } = get();
+    const l = scene.layers.find((x) => x.id === selectedLayerId);
+    if (!l) return;
+    animClipboard = JSON.parse(
+      JSON.stringify({ transform: l.transform, behaviors: l.behaviors ?? [], cloner: l.cloner }),
+    );
+  },
+
+  pasteAnimation: () => {
+    if (!animClipboard) return;
+    const { selectedLayerId } = get();
+    if (!selectedLayerId) return;
+    get().update((s) => {
+      const l = s.layers.find((x) => x.id === selectedLayerId);
+      if (!l) return;
+      const c = JSON.parse(JSON.stringify(animClipboard));
+      // Re-id pasted keyframes to avoid collisions.
+      for (const ch of Object.values(c.transform) as Array<{ keyframes: Keyframe[] }>) {
+        for (const k of ch.keyframes) k.id = `kf_${Math.random().toString(36).slice(2, 9)}`;
+      }
+      for (const b of c.behaviors) b.id = `beh_${Math.random().toString(36).slice(2, 9)}`;
+      l.transform = c.transform;
+      l.behaviors = c.behaviors;
+      l.cloner = c.cloner;
+    });
+  },
+
+  hasClipboard: () => animClipboard !== null,
 
   addKeyframe: (layerId, channelPath, kf) =>
     get().update((s) => {

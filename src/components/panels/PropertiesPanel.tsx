@@ -17,8 +17,15 @@ import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
 import { BEHAVIOR_LIST, behaviorDef } from "@/lib/anim/behaviorCatalog";
 import { applyPreset, BEHAVIOR_PRESETS } from "@/lib/anim/behaviors";
 import { AUTO_ANIMATE_LABELS, AUTO_ANIMATE_PRESETS } from "@/lib/anim/autoAnimate";
-import { CLONER_MODES, MATTE_MODES, type BehaviorType } from "@/lib/scene/schema";
+import {
+  CLONER_MODES,
+  MATTE_MODES,
+  TEXT_ANIM_KINDS,
+  TEXT_ANIM_UNITS,
+  type BehaviorType,
+} from "@/lib/scene/schema";
 import { createTrim } from "@/lib/scene/factory";
+import { FONTS, fontStack, loadFont } from "@/lib/fonts";
 import {
   BLEND_MODES,
   EXPORT_TARGETS,
@@ -499,53 +506,7 @@ function LayerProperties({ layer }: { layer: Layer }) {
         <StrokeTrimSection layer={layer} />
       )}
 
-      {layer.type === "text" && text && (
-        <Section title="Text" collapsible>
-          <Row>
-            <Label>Content</Label>
-            <TextInput
-              value={text.content}
-              onChange={(v) => set((l) => l.text && (l.text.content = v))}
-            />
-          </Row>
-          <Row>
-            <Label>Size</Label>
-            <NumberInput
-              value={text.fontSize}
-              min={1}
-              onChange={(v, live) =>
-                updateLayer(layer.id, (l) => l.text && (l.text.fontSize = v), live)
-              }
-            />
-          </Row>
-          <Row>
-            <Label>Weight</Label>
-            <Select
-              value={String(text.fontWeight)}
-              onChange={(v) => set((l) => l.text && (l.text.fontWeight = Number(v)))}
-              options={[400, 500, 600, 700, 800].map((w) => ({
-                value: String(w),
-                label: String(w),
-              }))}
-            />
-          </Row>
-          <Row>
-            <Label>Align</Label>
-            <Select
-              value={text.align}
-              onChange={(v) => set((l) => l.text && (l.text.align = v as TextAlign))}
-              options={TEXT_ALIGN.map((a) => ({ value: a, label: cap(a) }))}
-            />
-          </Row>
-          <Row>
-            <Label>Fill</Label>
-            <ColorInput
-              value={text.fill}
-              onChange={(v) => set((l) => l.text && (l.text.fill = v))}
-            />
-          </Row>
-        </Section>
-      )}
+      {layer.type === "text" && text && <TextSection layer={layer} />}
 
       <BehaviorsSection layer={layer} />
       <ClonerSection layer={layer} />
@@ -556,6 +517,165 @@ function LayerProperties({ layer }: { layer: Layer }) {
 }
 
 /* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*  Text — font picker, kinetic typography, number counter                     */
+/* -------------------------------------------------------------------------- */
+
+function TextSection({ layer }: { layer: Layer }) {
+  const updateLayer = useStore((s) => s.updateLayer);
+  const set = (patch: (l: Layer) => void, live = false) => updateLayer(layer.id, patch, live);
+  const text = layer.text!;
+  const family = FONTS.find((f) => f.stack === text.fontFamily)?.family ?? "Inter";
+  const weights = FONTS.find((f) => f.family === family)?.weights ?? [400, 700];
+  const counterOn = !!text.counter?.enabled;
+  const anim = text.animator ?? { kind: "none", unit: "character", stagger: 0.04, duration: 0.5, start: 0 };
+
+  return (
+    <>
+      <Section title="Text" collapsible>
+        <Row>
+          <Label>Content</Label>
+          <TextInput value={text.content} onChange={(v) => set((l) => l.text && (l.text.content = v))} />
+        </Row>
+        <Row>
+          <Label>Font</Label>
+          <Select
+            value={family}
+            onChange={async (v) => {
+              await loadFont(v);
+              set((l) => l.text && (l.text.fontFamily = fontStack(v)));
+            }}
+            options={FONTS.map((f) => ({ value: f.family, label: `${f.family} · ${f.category}` }))}
+          />
+        </Row>
+        <Row>
+          <Label>Size</Label>
+          <NumberInput value={text.fontSize} min={1}
+            onChange={(v, live) => set((l) => l.text && (l.text.fontSize = v), live)} />
+        </Row>
+        <Row>
+          <Label>Weight</Label>
+          <Select
+            value={String(text.fontWeight)}
+            onChange={(v) => set((l) => l.text && (l.text.fontWeight = Number(v)))}
+            options={weights.map((w) => ({ value: String(w), label: String(w) }))}
+          />
+        </Row>
+        <Row>
+          <Label>Align</Label>
+          <Select
+            value={text.align}
+            onChange={(v) => set((l) => l.text && (l.text.align = v as TextAlign))}
+            options={TEXT_ALIGN.map((a) => ({ value: a, label: cap(a) }))}
+          />
+        </Row>
+        <Row>
+          <Label>Fill</Label>
+          <ColorInput value={text.fill} onChange={(v) => set((l) => l.text && (l.text.fill = v))} />
+        </Row>
+      </Section>
+
+      {/* Kinetic typography */}
+      <Section title="Animate text" collapsible defaultOpen={false}>
+        <Row>
+          <Label>Style</Label>
+          <Select
+            value={anim.kind}
+            onChange={(v) =>
+              set((l) => {
+                if (!l.text) return;
+                if (v === "none") l.text.animator = undefined;
+                else l.text.animator = { ...anim, kind: v as typeof anim.kind };
+              })
+            }
+            options={TEXT_ANIM_KINDS.map((k) => ({ value: k, label: k === "none" ? "None" : cap(k.replace("-", " ")) }))}
+          />
+        </Row>
+        {anim.kind !== "none" && (
+          <>
+            <Row>
+              <Label>By</Label>
+              <Select
+                value={anim.unit}
+                onChange={(v) => set((l) => l.text?.animator && (l.text.animator.unit = v as typeof anim.unit))}
+                options={TEXT_ANIM_UNITS.map((u) => ({ value: u, label: cap(u) }))}
+              />
+            </Row>
+            <Row>
+              <Label>Stagger</Label>
+              <NumberInput value={anim.stagger} step={0.01} min={0} suffix="s"
+                onChange={(v, live) => set((l) => l.text?.animator && (l.text.animator.stagger = v), live)} />
+            </Row>
+            <Row>
+              <Label>Duration</Label>
+              <NumberInput value={anim.duration} step={0.05} min={0.05} suffix="s"
+                onChange={(v, live) => set((l) => l.text?.animator && (l.text.animator.duration = v), live)} />
+            </Row>
+            <Row>
+              <Label>Start</Label>
+              <NumberInput value={anim.start} step={0.05} min={0} suffix="s"
+                onChange={(v, live) => set((l) => l.text?.animator && (l.text.animator.start = v), live)} />
+            </Row>
+          </>
+        )}
+      </Section>
+
+      {/* Number counter */}
+      <Section
+        title="Number counter"
+        collapsible
+        defaultOpen={false}
+        right={
+          <label className="flex items-center gap-1.5 text-[10px] text-haze-400">
+            <input
+              type="checkbox"
+              checked={counterOn}
+              onChange={(e) =>
+                set((l) => {
+                  if (!l.text) return;
+                  l.text.counter = e.target.checked
+                    ? { enabled: true, from: 0, to: 100, decimals: 0, prefix: "", suffix: "", separator: true }
+                    : undefined;
+                })
+              }
+            />
+            on
+          </label>
+        }
+      >
+        {counterOn && text.counter ? (
+          <>
+            <Row>
+              <Label>From → To</Label>
+              <NumberInput value={text.counter.from}
+                onChange={(v, live) => set((l) => l.text?.counter && (l.text.counter.from = v), live)} />
+              <NumberInput value={text.counter.to}
+                onChange={(v, live) => set((l) => l.text?.counter && (l.text.counter.to = v), live)} />
+            </Row>
+            <Row>
+              <Label>Decimals</Label>
+              <NumberInput value={text.counter.decimals} min={0} max={4} step={1}
+                onChange={(v, live) => set((l) => l.text?.counter && (l.text.counter.decimals = Math.round(v)), live)} />
+            </Row>
+            <Row>
+              <Label>Prefix</Label>
+              <TextInput value={text.counter.prefix} onChange={(v) => set((l) => l.text?.counter && (l.text.counter.prefix = v))} />
+              <TextInput value={text.counter.suffix} onChange={(v) => set((l) => l.text?.counter && (l.text.counter.suffix = v))} />
+            </Row>
+            <label className="flex items-center gap-2 text-[11px] text-haze-300">
+              <input type="checkbox" checked={text.counter.separator}
+                onChange={(e) => set((l) => l.text?.counter && (l.text.counter.separator = e.target.checked))} />
+              Thousands separator
+            </label>
+          </>
+        ) : (
+          <p className="text-[11px] text-haze-500">Animate a value counting up over the comp duration (great for stats).</p>
+        )}
+      </Section>
+    </>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Stroke & Trim Paths (draw-on animation)                                    */
@@ -711,6 +831,7 @@ function AlignSection({ layer }: { layer: Layer }) {
 
 function AutoAnimateSection({ layer }: { layer: Layer }) {
   const autoAnimate = useStore((s) => s.autoAnimate);
+  const magicAnimate = useStore((s) => s.magicAnimate);
   const [mode, setMode] = useState<"in" | "out" | "both">("in");
 
   return (
@@ -730,9 +851,24 @@ function AutoAnimateSection({ layer }: { layer: Layer }) {
         />
       }
     >
+      {/* One-click magic */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => magicAnimate(layer.id, false)}
+          className="flex-1 rounded bg-brand-500 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-brand-400"
+        >
+          ✦ Animate this
+        </button>
+        <button
+          onClick={() => magicAnimate(layer.id, true)}
+          title="Re-roll a fresh variation"
+          className="rounded bg-ink-700 px-2.5 py-1.5 text-[11px] text-haze-200 transition hover:bg-ink-600"
+        >
+          🎲
+        </button>
+      </div>
       <p className="text-[11px] text-haze-500">
-        One-click polished transitions with magic easing — applied to this
-        layer&apos;s transform.
+        Or pick a polished transition (magic easing, this layer&apos;s transform):
       </p>
       <div className="grid grid-cols-2 gap-1">
         {AUTO_ANIMATE_PRESETS.map((preset) => (

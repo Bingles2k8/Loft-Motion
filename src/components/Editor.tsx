@@ -62,6 +62,17 @@ export function Editor() {
         else s.undo();
         return;
       }
+      // Copy / paste animation (⌘C / ⌘V) on the selected layer.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && !typing && s.selectedLayerId) {
+        e.preventDefault();
+        s.copyAnimation();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v" && !typing && s.selectedLayerId) {
+        e.preventDefault();
+        s.pasteAnimation();
+        return;
+      }
       if (typing) return;
 
       const frame = 1 / s.scene.composition.fps;
