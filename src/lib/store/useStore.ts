@@ -127,6 +127,7 @@ export interface StoreState {
   showSettings: boolean;
   showExamples: boolean;
   showShortcuts: boolean;
+  showAgent: boolean;
 
   // Scene mutations
   update: (recipe: Recipe) => void;
@@ -228,6 +229,7 @@ export interface StoreState {
   setShowSettings: (v: boolean) => void;
   setShowExamples: (v: boolean) => void;
   setShowShortcuts: (v: boolean) => void;
+  setShowAgent: (v: boolean) => void;
 
   // Channel solo + auto-keyframe
   toggleSoloChannel: (layerId: string, channelPath: string) => void;
@@ -302,6 +304,7 @@ export const useStore = create<StoreState>((set, get) => ({
   showSettings: false,
   showExamples: false,
   showShortcuts: false,
+  showAgent: false,
 
   update: (recipe) =>
     set((state) => {
@@ -721,6 +724,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setShowSettings: (v) => set({ showSettings: v }),
   setShowExamples: (v) => set({ showExamples: v }),
   setShowShortcuts: (v) => set({ showShortcuts: v }),
+  setShowAgent: (v) => set({ showAgent: v }),
 
   toggleSoloChannel: (layerId, channelPath) =>
     set((s) => {

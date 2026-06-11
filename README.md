@@ -45,6 +45,39 @@ The renderer, timeline, exporters and capability engine all read from it.
 | Exporters | `src/lib/export/` | MP4 (WebCodecs + mediabunny), Lottie (bodymovin), CSS (@keyframes). |
 | Store | `src/lib/store/useStore.ts` | Zustand, immutable updates, undo/redo. |
 | UI | `src/components/` | Stage, hybrid Timeline, Properties, Export & Craft panels. |
+| Agent layer | `src/lib/agent/` | LLM-facing `AnimationSpec` DSL → `compileSpec` → scene document. |
+
+## Animate from a text prompt (LLM agent)
+
+Loft Motion can be driven by a language model. The model writes a small,
+intent-level **AnimationSpec** (JSON) — "a title that rises, a glowing orb that
+pulses, a subtitle that fades up" — and the compiler expands it into a full,
+beautiful scene document with hand-tuned keyframes, staggers and easings. From
+there you get **either a project or a video**, whichever the user asked for.
+
+```
+text prompt ─► AnimationSpec (LLM) ─► compileSpec() ─► SceneDocument ─► project / video
+```
+
+The same browser-free compiler runs three ways:
+
+```bash
+npm run agent guide                       # the authoring guide (hand it to a model)
+npm run agent example > spec.json         # a sample spec
+npm run agent build spec.json -o out.loft.json   # spec → Loft Motion project
+npm run mcp                               # an MCP server for chat agents
+```
+
+- **MCP server** — `mcp-server/loft-motion-mcp.mjs`, zero-dependency, exposes
+  `get_guide` / `get_spec_schema` / `create_project` …
+- **CLI** — `scripts/loft-agent.mjs`, validates + compiles specs headlessly.
+- **In the app** — a **Prompt** button to build a spec onto the stage, plus URL
+  ingestion (`?spec=…&export=mp4&download=1`) and a `window.LoftAgent` API so an
+  automated agent can render a **video** in the browser engine.
+
+Full reference: [`docs/LLM_AGENT.md`](docs/LLM_AGENT.md). Both the CLI and MCP
+server run the project's real TypeScript via a tiny Node resolve hook + native
+type-stripping — no build step, no extra deps.
 
 ## Tech stack
 

@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "agent": "node scripts/loft-agent.mjs",
+    "mcp": "node mcp-server/loft-motion-mcp.mjs"
   },
   "dependencies": {
     "gifenc": "^1.0.3",

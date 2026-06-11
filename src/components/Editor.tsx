@@ -12,6 +12,8 @@ import { PrinciplesPanel } from "@/components/panels/PrinciplesPanel";
 import { SettingsPanel } from "@/components/panels/SettingsPanel";
 import { ExamplesPanel } from "@/components/panels/ExamplesPanel";
 import { ShortcutsPanel } from "@/components/panels/ShortcutsPanel";
+import { AgentPanel } from "@/components/panels/AgentPanel";
+import { AgentBridge } from "@/components/AgentBridge";
 import { Splitter } from "@/components/ui/Splitter";
 
 export function Editor() {
@@ -180,6 +182,8 @@ export function Editor() {
       <SettingsPanel />
       <ExamplesPanel />
       <ShortcutsPanel />
+      <AgentPanel />
+      <AgentBridge />
     </div>
   );
 }

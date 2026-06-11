@@ -69,6 +69,7 @@ export function Toolbar() {
   const setShowSettings = useStore((s) => s.setShowSettings);
   const setShowExamples = useStore((s) => s.setShowExamples);
   const setShowShortcuts = useStore((s) => s.setShowShortcuts);
+  const setShowAgent = useStore((s) => s.setShowAgent);
   const setShowPrinciples = useStore((s) => s.setShowPrinciples);
   const showPrinciples = useStore((s) => s.showPrinciples);
   const setLeftTab = useStore((s) => s.setLeftTab);
@@ -174,6 +175,16 @@ export function Toolbar() {
           className="mx-auto block w-full max-w-xs rounded bg-transparent px-2 py-1 text-center text-sm font-medium text-haze-300 transition hover:bg-ink-800 focus:bg-ink-800 focus:text-haze-200 focus:outline-none"
         />
       </div>
+
+      {/* Animate from a text prompt (LLM → AnimationSpec → motion) */}
+      <button
+        onClick={() => setShowAgent(true)}
+        title="Animate from a text prompt"
+        className="flex h-8 items-center gap-1.5 rounded bg-gradient-to-r from-brand-500/25 to-brand-400/15 px-2.5 text-xs font-semibold text-brand-200 ring-1 ring-inset ring-brand-500/30 transition hover:from-brand-500/35 hover:to-brand-400/25 hover:text-brand-100"
+      >
+        <IconSpark width={15} height={15} />
+        Prompt
+      </button>
 
       {/* Principles toggle */}
       <button
