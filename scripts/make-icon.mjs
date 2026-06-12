@@ -11,16 +11,17 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-const SIZE = 256;
+const SIZE = 512;
 const SS = 3; // supersample factor
 const HS = SIZE * SS;
+const K = SIZE / 256; // geometry below is authored in 256-space
 
-// geometry (in 256-space)
-const PAD = 14, R = 58;
+// geometry (scaled to SIZE)
+const PAD = 14 * K, R = 58 * K;
 const x0 = PAD, y0 = PAD, x1 = SIZE - PAD, y1 = SIZE - PAD;
 // the "L"
-const stem = { x0: 96, x1: 122, y0: 70, y1: 186 };
-const foot = { x0: 96, x1: 178, y0: 160, y1: 186 };
+const stem = { x0: 96 * K, x1: 122 * K, y0: 70 * K, y1: 186 * K };
+const foot = { x0: 96 * K, x1: 178 * K, y0: 160 * K, y1: 186 * K };
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const TOP = [96, 161, 222], BOT = [60, 112, 166], WHITE = [248, 250, 252];

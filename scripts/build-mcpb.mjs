@@ -43,6 +43,22 @@ await esbuild.build({
 });
 
 /* 2 — manifest ----------------------------------------------------------- */
+// Track the newest manifest version the installed packer (and therefore a
+// current Claude Desktop) understands, so a recent app doesn't reject an older
+// schema value.
+let MANIFEST_VERSION = "0.2";
+try {
+  const latest = JSON.parse(
+    (await import("node:fs")).readFileSync(
+      path.join(ROOT, "node_modules/@anthropic-ai/mcpb/schemas/mcpb-manifest-latest.schema.json"),
+      "utf8",
+    ),
+  );
+  MANIFEST_VERSION = latest?.properties?.manifest_version?.const ?? MANIFEST_VERSION;
+} catch {
+  /* fall back to 0.2 */
+}
+
 const TOOLS = [
   { name: "get_guide", description: "The Loft Motion authoring guide (read first)." },
   { name: "get_spec_schema", description: "JSON Schema for an AnimationSpec." },
@@ -52,7 +68,7 @@ const TOOLS = [
 ];
 
 const manifest = {
-  manifest_version: "0.2",
+  manifest_version: MANIFEST_VERSION,
   name: "loft-motion",
   display_name: "Loft Motion",
   version: VERSION,
