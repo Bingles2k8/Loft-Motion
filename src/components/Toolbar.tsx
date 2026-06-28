@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useStore } from "@/lib/store/useStore";
 import {
   classifyFile,
@@ -19,25 +19,25 @@ import {
   IconUpload,
 } from "@/components/ui/icons";
 
-function ToolButton({
+function MenuItem({
+  icon,
+  label,
+  hint,
   onClick,
-  title,
-  disabled,
-  children,
 }: {
+  icon?: React.ReactNode;
+  label: string;
+  hint?: string;
   onClick: () => void;
-  title: string;
-  disabled?: boolean;
-  children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      title={title}
-      disabled={disabled}
-      className="flex h-8 w-8 items-center justify-center rounded text-haze-300 transition hover:bg-ink-700 hover:text-haze-200 disabled:cursor-default disabled:opacity-30"
+      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-haze-200 transition hover:bg-ink-700"
     >
-      {children}
+      <span className="grid h-4 w-4 place-items-center text-haze-400">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {hint && <span className="text-[10px] text-haze-500">{hint}</span>}
     </button>
   );
 }
@@ -52,10 +52,14 @@ export function Toolbar() {
   const setShowShortcuts = useStore((s) => s.setShowShortcuts);
   const setShowAgent = useStore((s) => s.setShowAgent);
   const setShowPrinciples = useStore((s) => s.setShowPrinciples);
-  const showPrinciples = useStore((s) => s.showPrinciples);
   const setLeftTab = useStore((s) => s.setLeftTab);
 
   const importInput = useRef<HTMLInputElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const run = (fn: () => void) => () => {
+    fn();
+    setMenuOpen(false);
+  };
 
   /**
    * Unified Import: a .loft.json scene loads as the project; media files are
@@ -95,14 +99,37 @@ export function Toolbar() {
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-ink-700 bg-ink-850 px-3">
-      {/* Hamburger → scene settings */}
-      <ToolButton title="Scene settings" onClick={() => setShowSettings(true)}>
-        <IconMenu />
-      </ToolButton>
+      {/* Main menu — consolidates the secondary actions (Figma-style). */}
+      <div className="relative">
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          title="Menu"
+          className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
+            menuOpen ? "bg-ink-700 text-haze-200" : "text-haze-300 hover:bg-ink-700 hover:text-haze-200"
+          }`}
+        >
+          <IconMenu />
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute left-0 top-10 z-50 w-56 overflow-hidden rounded-lg border border-ink-600 bg-ink-850 py-1 shadow-xl">
+              <MenuItem icon={<IconGrid width={14} height={14} />} label="Template gallery" onClick={run(() => setShowExamples(true))} />
+              <MenuItem icon={<IconSpark width={14} height={14} />} label="Motion principles" onClick={run(() => setShowPrinciples(true))} />
+              <MenuItem label="Keyboard shortcuts" hint="?" onClick={run(() => setShowShortcuts(true))} />
+              <div className="my-1 border-t border-ink-700" />
+              <MenuItem icon={<IconUpload width={14} height={14} />} label="Import media or scene…" onClick={run(() => importInput.current?.click())} />
+              <MenuItem icon={<IconDownload width={14} height={14} />} label="Save scene (.loft.json)" onClick={run(() => downloadSceneJson(useStore.getState().scene))} />
+              <div className="my-1 border-t border-ink-700" />
+              <MenuItem label="Scene settings…" onClick={run(() => setShowSettings(true))} />
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Brand */}
       <div className="flex items-center gap-2 pr-1">
-        <div className="grid h-6 w-6 place-items-center rounded bg-brand-500 text-white">
+        <div className="grid h-6 w-6 place-items-center rounded-md bg-brand-500 text-white">
           <IconLayers width={14} height={14} />
         </div>
         <span className="text-sm font-semibold tracking-tight text-haze-200">
@@ -119,7 +146,7 @@ export function Toolbar() {
               s.name = e.target.value;
             })
           }
-          className="mx-auto block w-full max-w-xs rounded bg-transparent px-2 py-1 text-center text-sm font-medium text-haze-300 transition hover:bg-ink-800 focus:bg-ink-800 focus:text-haze-200 focus:outline-none"
+          className="mx-auto block w-full max-w-xs rounded-md bg-transparent px-2 py-1 text-center text-sm font-medium text-haze-300 transition hover:bg-ink-800 focus:bg-ink-800 focus:text-haze-200 focus:outline-none"
         />
       </div>
 
@@ -127,59 +154,16 @@ export function Toolbar() {
       <button
         onClick={() => setShowAgent(true)}
         title="Animate from a text prompt"
-        className="flex h-8 items-center gap-1.5 rounded bg-gradient-to-r from-brand-500/25 to-brand-400/15 px-2.5 text-xs font-semibold text-brand-200 ring-1 ring-inset ring-brand-500/30 transition hover:from-brand-500/35 hover:to-brand-400/25 hover:text-brand-100"
+        className="flex h-8 items-center gap-1.5 rounded-md bg-gradient-to-r from-brand-500/25 to-brand-400/15 px-2.5 text-xs font-semibold text-brand-600 ring-1 ring-inset ring-brand-500/30 transition hover:from-brand-500/35 hover:to-brand-400/25"
       >
         <IconSpark width={15} height={15} />
         Prompt
       </button>
 
-      {/* Principles toggle */}
-      <button
-        onClick={() => setShowPrinciples(!showPrinciples)}
-        title="Motion principles"
-        className={`flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition ${
-          showPrinciples
-            ? "bg-brand-500/20 text-brand-300"
-            : "text-haze-300 hover:bg-ink-700 hover:text-haze-200"
-        }`}
-      >
-        <IconSpark width={15} height={15} />
-        Craft
-      </button>
-
-      {/* Example projects */}
-      <button
-        onClick={() => setShowExamples(true)}
-        title="Example projects"
-        className="flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium text-haze-300 transition hover:bg-ink-700 hover:text-haze-200"
-      >
-        <IconGrid width={15} height={15} />
-        Examples
-      </button>
-
-      {/* Keyboard shortcuts */}
-      <ToolButton title="Keyboard shortcuts (?)" onClick={() => setShowShortcuts(true)}>
-        <span className="text-sm font-semibold">?</span>
-      </ToolButton>
-
-      {/* Import (scene JSON or media) / save scene */}
-      <ToolButton
-        title="Import media or scene"
-        onClick={() => importInput.current?.click()}
-      >
-        <IconUpload />
-      </ToolButton>
-      <ToolButton
-        title="Save scene (.loft.json)"
-        onClick={() => downloadSceneJson(useStore.getState().scene)}
-      >
-        <IconDownload />
-      </ToolButton>
-
       {/* Export */}
       <button
         onClick={() => setShowExport(true)}
-        className="ml-1 flex h-8 items-center gap-1.5 rounded bg-brand-500 px-3.5 text-xs font-semibold text-white transition hover:bg-brand-400"
+        className="flex h-8 items-center gap-1.5 rounded-md bg-brand-500 px-3.5 text-xs font-semibold text-white transition hover:bg-brand-400"
       >
         Export
       </button>

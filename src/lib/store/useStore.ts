@@ -86,7 +86,7 @@ function loadSizes(): PanelSizes {
   return DEFAULT_SIZES;
 }
 
-export type LeftTab = "project" | "effects" | "behaviors" | "palette";
+export type LeftTab = "layers" | "project" | "effects" | "behaviors" | "palette";
 
 /** UI3-style colour theme. Light is the default identity (Figma-like). */
 export type Theme = "light" | "dark";
@@ -322,7 +322,7 @@ export const useStore = create<StoreState>((set, get) => ({
   viewPanY: 0,
 
   sizes: loadSizes(),
-  leftTab: "project",
+  leftTab: "layers",
   theme: loadTheme(),
   mode: "motion",
 
