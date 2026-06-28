@@ -28,6 +28,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ["⌘/Ctrl ⇧ Z", "Redo"],
       ["Delete", "Delete selected keyframes / layer"],
       ["Shift G", "Toggle graph editor"],
+      ["Shift E", "Toggle Design / Motion mode"],
       ["?", "This shortcuts panel"],
     ],
   },

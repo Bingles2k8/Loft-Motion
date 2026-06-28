@@ -16,6 +16,13 @@ import { createBehavior, createCloner, createEffect, kf as makeKf } from "@/lib/
 import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
 import { BEHAVIOR_LIST, behaviorDef } from "@/lib/anim/behaviorCatalog";
 import { applyPreset, BEHAVIOR_PRESETS } from "@/lib/anim/behaviors";
+import {
+  SPRING_PRESETS,
+  SPRING_PRESET_LABELS,
+  SPRING_PRESET_PARAMS,
+  springResponse,
+  springSettleTime,
+} from "@/lib/anim/spring";
 import { AUTO_ANIMATE_LABELS, AUTO_ANIMATE_PRESETS } from "@/lib/anim/autoAnimate";
 import {
   CLONER_MODES,
@@ -235,14 +242,49 @@ function CurveThumb({ bezier }: { bezier: [number, number, number, number] }) {
   const sy = (y: number) => H - pad - y * (H - 2 * pad);
   return (
     <svg width={W} height={H} className="shrink-0 rounded bg-ink-900 ring-1 ring-ink-700">
-      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="#2b2b2b" />
-      <line x1={sx(0)} y1={sy(1)} x2={sx(1)} y2={sy(1)} stroke="#2b2b2b" />
+      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="var(--color-ink-700)" />
+      <line x1={sx(0)} y1={sy(1)} x2={sx(1)} y2={sy(1)} stroke="var(--color-ink-700)" />
       <path
         d={`M ${sx(0)} ${sy(0)} C ${sx(x1)} ${sy(y1)}, ${sx(x2)} ${sy(y2)}, ${sx(1)} ${sy(1)}`}
         fill="none"
-        stroke="#4f8fcb"
+        stroke="var(--color-brand-500)"
         strokeWidth={1.5}
       />
+    </svg>
+  );
+}
+
+/** Live preview of a spring's normalised step response (overshoot included). */
+function SpringGraph({
+  stiffness,
+  damping,
+  mass,
+}: {
+  stiffness: number;
+  damping: number;
+  mass: number;
+}) {
+  const W = 196;
+  const H = 56;
+  const pad = 6;
+  const p = { stiffness, damping, mass };
+  const dur = springSettleTime(p);
+  const N = 64;
+  // Sample, then frame the curve so overshoot stays visible.
+  const ys: number[] = [];
+  for (let i = 0; i <= N; i++) ys.push(springResponse((i / N) * dur, p));
+  const lo = Math.min(0, ...ys);
+  const hi = Math.max(1, ...ys);
+  const sx = (i: number) => pad + (i / N) * (W - 2 * pad);
+  const sy = (y: number) => H - pad - ((y - lo) / (hi - lo || 1)) * (H - 2 * pad);
+  const d = ys.map((y, i) => `${i === 0 ? "M" : "L"} ${sx(i).toFixed(1)} ${sy(y).toFixed(1)}`).join(" ");
+  const settledY = sy(1);
+
+  return (
+    <svg width={W} height={H} className="w-full rounded bg-ink-900 ring-1 ring-ink-700">
+      {/* settle line (value = 1) */}
+      <line x1={pad} y1={settledY} x2={W - pad} y2={settledY} stroke="var(--color-ink-700)" strokeDasharray="3 3" />
+      <path d={d} fill="none" stroke="var(--color-brand-500)" strokeWidth={1.5} />
     </svg>
   );
 }
@@ -1029,6 +1071,36 @@ function BehaviorCard({
               </button>
             ))}
           </div>
+
+          {/* Spring — Figma-style named presets + a live response graph. */}
+          {b.type === "spring" && (
+            <div className="space-y-1.5 rounded-md border border-ink-700 p-1.5">
+              <div className="grid grid-cols-4 gap-1">
+                {SPRING_PRESETS.map((sp) => (
+                  <button
+                    key={sp}
+                    onClick={() =>
+                      updateBehavior(layerId, behaviorId, (x) => {
+                        x.params = { ...x.params, ...SPRING_PRESET_PARAMS[sp] };
+                      })
+                    }
+                    className="rounded bg-ink-700 py-0.5 text-[10px] text-haze-300 transition hover:bg-ink-600 hover:text-haze-100"
+                  >
+                    {SPRING_PRESET_LABELS[sp]}
+                  </button>
+                ))}
+              </div>
+              <SpringGraph
+                stiffness={b.params.stiffness ?? 170}
+                damping={b.params.damping ?? 12}
+                mass={b.params.mass ?? 1}
+              />
+              <p className="text-[10px] leading-snug text-haze-500">
+                Springs render exactly in preview &amp; MP4. CSS/Lottie bake the
+                motion per-frame (no single easing curve can describe a bounce).
+              </p>
+            </div>
+          )}
           {/* Target + strength */}
           <Row>
             <Label>Apply to</Label>
