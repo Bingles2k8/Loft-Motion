@@ -245,63 +245,62 @@ function doc(
 function auroraPromo(): SceneDocument {
   const DUR = 7;
   const cx = 960;
-  const bg = shape("Backdrop", "rect", cx, 540, 1920, 1080, "#0b1020", {
-    gradientTo: "#1a1340",
+  const bg = shape("Backdrop", "rect", cx, 540, 1920, 1080, "#160a2e", {
+    gradientTo: "#3b1466",
     gradientAngle: 120,
   });
   // Soft aurora blobs drifting behind everything.
-  const blobA = shape("Aurora A", "ellipse", 560, 360, 900, 900, "#3b5bff", {
-    opacity: 38, blend: "screen", effects: [bloom(1.4)], behaviors: [wiggle("position", 0.25, 60)],
+  const blobA = shape("Aurora A", "ellipse", 560, 360, 900, 900, "#7c3aed", {
+    opacity: 42, blend: "screen", effects: [bloom(1.4)], behaviors: [wiggle("position", 0.25, 60)],
   });
-  const blobB = shape("Aurora B", "ellipse", 1420, 760, 820, 820, "#c54bff", {
-    opacity: 34, blend: "screen", effects: [bloom(1.4)], behaviors: [wiggle("position", 0.3, 70)],
+  const blobB = shape("Aurora B", "ellipse", 1420, 760, 820, 820, "#ec4899", {
+    opacity: 38, blend: "screen", effects: [bloom(1.4)], behaviors: [wiggle("position", 0.3, 70)],
   });
   // Floating particle field.
-  const dust = shape("Particles", "ellipse", cx, 540, 8, 8, "#bcd0ff", {
+  const dust = shape("Particles", "ellipse", cx, 540, 8, 8, "#e9d5ff", {
     opacity: 70,
     cloner: clonerOf({ mode: "grid", cols: 12, rows: 7, spacingX: 150, spacingY: 150, stepOpacity: -2, stagger: 0.04 }),
     behaviors: [wiggle("position", 0.6, 26)],
   });
   // Glowing product card that springs in.
-  const card = shape("Product Card", "rect", cx, 560, 760, 460, "#141a2e", {
+  const card = shape("Product Card", "rect", cx, 560, 760, 460, "#1a1033", {
     r: 36,
-    gradientTo: "#1d2747", gradientAngle: 135,
-    stroke: { color: "#4f7cff", width: 2 },
-    effects: [glow("#4f7cff", 0.9), shadow()],
+    gradientTo: "#2a1a4d", gradientAngle: 135,
+    stroke: { color: "#a855f7", width: 2 },
+    effects: [glow("#a855f7", 0.9), shadow()],
     as: [k(0.2, 0, "overshoot"), k(1.1, 100, "overshoot")],
     aop: [k(0.2, 0, "gentle"), k(0.7, 100, "gentle")],
     ay: [k(0.2, 600, "settle"), k(1.1, 560, "settle")],
   });
   // Inner mock UI lines on the card.
-  const bar1 = shape("UI Bar 1", "rect", cx - 180, 470, 280, 26, "#4f7cff", {
+  const bar1 = shape("UI Bar 1", "rect", cx - 180, 470, 280, 26, "#c084fc", {
     r: 13, aop: [k(0.9, 0, "gentle"), k(1.3, 100, "gentle")], asx: [k(0.9, 0, "settle"), k(1.5, 100, "settle")], anchorX: 0,
   });
-  const bar2 = shape("UI Bar 2", "rect", cx - 120, 560, 520, 18, "#33406b", {
+  const bar2 = shape("UI Bar 2", "rect", cx - 120, 560, 520, 18, "#3b2a5c", {
     r: 9, aop: [k(1.05, 0, "gentle"), k(1.45, 100, "gentle")], asx: [k(1.05, 0, "settle"), k(1.65, 100, "settle")], anchorX: 0,
   });
-  const bar3 = shape("UI Bar 3", "rect", cx - 150, 610, 400, 18, "#33406b", {
+  const bar3 = shape("UI Bar 3", "rect", cx - 150, 610, 400, 18, "#3b2a5c", {
     r: 9, aop: [k(1.2, 0, "gentle"), k(1.6, 100, "gentle")], asx: [k(1.2, 0, "settle"), k(1.8, 100, "settle")], anchorX: 0,
   });
   // Headline + sub + CTA.
-  const kicker = text("Kicker", "INTRODUCING", cx, 210, 34, 700, "#7c9bff", {
+  const kicker = text("Kicker", "INTRODUCING", cx, 210, 34, 700, "#c4b5fd", {
     letter: 10, aop: [k(1.4, 0, "gentle"), k(1.9, 100, "gentle")], ay: [k(1.4, 240, "settle"), k(1.9, 210, "settle")],
   });
   const title = text("Headline", "Build motion that ships", cx, 300, 96, 800, "#ffffff", {
     letter: -2,
     animator: { kind: "fade-up", unit: "word", stagger: 0.08, duration: 0.6, start: 1.6 },
   });
-  const sub = text("Subhead", "Design, animate and export — all in the browser.", cx, 880, 36, 500, "#aab6da", {
+  const sub = text("Subhead", "Design, animate and export — all in the browser.", cx, 880, 36, 500, "#c7b8e8", {
     aop: [k(2.4, 0, "gentle"), k(3, 100, "gentle")], ay: [k(2.4, 910, "settle"), k(3, 880, "settle")],
   });
-  const cta = shape("CTA", "rect", cx, 970, 320, 84, "#4f7cff", {
-    r: 42, effects: [glow("#4f7cff", 1.1)],
+  const cta = shape("CTA", "rect", cx, 970, 320, 84, "#a855f7", {
+    r: 42, effects: [glow("#a855f7", 1.1)],
     as: [k(2.8, 0, "overshoot"), k(3.5, 100, "overshoot")],
-    behaviors: [], // subtle idle handled by pulse below via scale keys
   });
   const ctaLabel = text("CTA Label", "Start free", cx, 970, 34, 700, "#ffffff", {
     aop: [k(3.1, 0, "gentle"), k(3.5, 100, "gentle")],
   });
-  return doc("Aurora Product Promo", 1920, 1080, DUR, "#0b1020", [
+  return doc("Aurora Product Promo", 1920, 1080, DUR, "#160a2e", [
     bg, blobA, blobB, dust, card, bar1, bar2, bar3, kicker, title, sub, cta, ctaLabel,
   ]);
 }
@@ -310,15 +309,15 @@ function auroraPromo(): SceneDocument {
 function appOnboarding(): SceneDocument {
   const DUR = 6;
   const cx = 540;
-  const bg = shape("Backdrop", "rect", cx, 960, 1080, 1920, "#0e1226", {
-    gradientTo: "#172a52", gradientAngle: 160,
+  const bg = shape("Backdrop", "rect", cx, 960, 1080, 1920, "#04211c", {
+    gradientTo: "#0b3b32", gradientAngle: 160,
   });
-  const halo = shape("Halo", "ellipse", cx, 620, 760, 760, "#2f6bff", {
-    opacity: 30, blend: "screen", effects: [bloom(1.5)], as: [k(0, 80, "settle"), k(1.2, 100, "settle")],
+  const halo = shape("Halo", "ellipse", cx, 620, 760, 760, "#10b981", {
+    opacity: 32, blend: "screen", effects: [bloom(1.5)], as: [k(0, 80, "settle"), k(1.2, 100, "settle")],
   });
   // Hero app icon that pops.
-  const icon = shape("App Icon", "rect", cx, 620, 300, 300, "#4f7cff", {
-    r: 72, gradientTo: "#8a5bff", gradientAngle: 135, effects: [glow("#6f8bff", 1.2), shadow()],
+  const icon = shape("App Icon", "rect", cx, 620, 300, 300, "#14b8a6", {
+    r: 72, gradientTo: "#06b6d4", gradientAngle: 135, effects: [glow("#2dd4bf", 1.2), shadow()],
     as: [k(0.2, 0, "overshoot"), k(1.0, 100, "overshoot")],
     arot: [k(0.2, -20, "overshoot"), k(1.0, 0, "overshoot")],
   });
@@ -329,19 +328,19 @@ function appOnboarding(): SceneDocument {
   const title = text("Title", "Welcome aboard", cx, 920, 76, 800, "#ffffff", {
     aop: [k(1.1, 0, "gentle"), k(1.6, 100, "gentle")], ay: [k(1.1, 970, "settle"), k(1.6, 920, "settle")],
   });
-  const body = text("Body", "Three quick things to get you moving.", cx, 1010, 36, 500, "#9fb0d8", {
+  const body = text("Body", "Three quick things to get you moving.", cx, 1010, 36, 500, "#86d6c9", {
     aop: [k(1.3, 0, "gentle"), k(1.8, 100, "gentle")], ay: [k(1.3, 1050, "settle"), k(1.8, 1010, "settle")],
   });
   // Three feature rows that stagger up.
   const rowsY = [1200, 1360, 1520];
-  const rowColors = ["#4f7cff", "#36c2a8", "#ffb05a"];
+  const rowColors = ["#2dd4bf", "#34d399", "#22d3ee"];
   const rowText = ["Realtime preview", "Export to MP4 & Lottie", "Templates included"];
   const rows: Layer[] = [];
   rowsY.forEach((ry, i) => {
     const delay = 1.9 + i * 0.22;
     rows.push(
-      shape(`Row ${i + 1}`, "rect", cx, ry, 860, 120, "#16203f", {
-        r: 28, stroke: { color: "#26345f", width: 1.5 },
+      shape(`Row ${i + 1}`, "rect", cx, ry, 860, 120, "#0a2b25", {
+        r: 28, stroke: { color: "#16544a", width: 1.5 },
         aop: [k(delay, 0, "gentle"), k(delay + 0.4, 100, "gentle")],
         ax: [k(delay, cx + 120, "settle"), k(delay + 0.5, cx, "settle")],
       }),
@@ -360,14 +359,14 @@ function appOnboarding(): SceneDocument {
     );
   });
   // Bottom CTA.
-  const cta = shape("CTA", "rect", cx, 1740, 760, 110, "#4f7cff", {
-    r: 55, effects: [glow("#4f7cff", 1.1)],
+  const cta = shape("CTA", "rect", cx, 1740, 760, 110, "#14b8a6", {
+    r: 55, effects: [glow("#14b8a6", 1.1)],
     as: [k(2.9, 0, "overshoot"), k(3.5, 100, "overshoot")],
   });
-  const ctaLabel = text("CTA Label", "Get started", cx, 1740, 40, 700, "#ffffff", {
+  const ctaLabel = text("CTA Label", "Get started", cx, 1740, 40, 700, "#04211c", {
     aop: [k(3.2, 0, "gentle"), k(3.6, 100, "gentle")],
   });
-  return doc("App Onboarding", 1080, 1920, DUR, "#0e1226", [
+  return doc("App Onboarding", 1080, 1920, DUR, "#04211c", [
     bg, halo, icon, glyph, title, body, ...rows, cta, ctaLabel,
   ]);
 }
@@ -375,8 +374,8 @@ function appOnboarding(): SceneDocument {
 /** 3 — Metrics Dashboard reveal (16:9, 6.5s). */
 function metricsDashboard(): SceneDocument {
   const DUR = 6.5;
-  const bg = shape("Backdrop", "rect", 960, 540, 1920, 1080, "#0c1322", {
-    gradientTo: "#101a30", gradientAngle: 120,
+  const bg = shape("Backdrop", "rect", 960, 540, 1920, 1080, "#0b1220", {
+    gradientTo: "#0f2133", gradientAngle: 120,
   });
   // Faint grid of dots.
   const grid = shape("Grid", "ellipse", 960, 540, 5, 5, "#22304f", {
@@ -393,10 +392,10 @@ function metricsDashboard(): SceneDocument {
   // Four KPI cards with counters.
   const cardX = [430, 860, 1290, 1720];
   const kpis = [
-    { label: "Revenue", to: 128400, prefix: "$", suffix: "", color: "#4f7cff" },
-    { label: "New Users", to: 9320, prefix: "", suffix: "", color: "#36c2a8" },
-    { label: "Conversion", to: 24, prefix: "", suffix: "%", color: "#ffb05a" },
-    { label: "Sessions", to: 56100, prefix: "", suffix: "", color: "#c54bff" },
+    { label: "Revenue", to: 128400, prefix: "$", suffix: "", color: "#22d3ee" },
+    { label: "New Users", to: 9320, prefix: "", suffix: "", color: "#34d399" },
+    { label: "Conversion", to: 24, prefix: "", suffix: "%", color: "#fbbf24" },
+    { label: "Sessions", to: 56100, prefix: "", suffix: "", color: "#f472b6" },
   ];
   const cards: Layer[] = [];
   kpis.forEach((kp, i) => {
@@ -430,9 +429,9 @@ function metricsDashboard(): SceneDocument {
     const bx = 360 + i * 200;
     const delay = 1.8 + i * 0.1;
     bars.push(
-      shape(`Bar ${i + 1}`, "rect", bx, baseY, 96, hgt, "#4f7cff", {
+      shape(`Bar ${i + 1}`, "rect", bx, baseY, 96, hgt, "#22d3ee", {
         r: 14, anchorY: 1,
-        gradientTo: "#36c2a8", gradientAngle: 0,
+        gradientTo: "#0ea5e9", gradientAngle: 0,
         asy: [k(delay, 0, "settle"), k(delay + 0.6, 100, "settle")],
       }),
     );
@@ -441,7 +440,7 @@ function metricsDashboard(): SceneDocument {
     anchorX: 0.5, asx: [k(1.7, 0, "snappy"), k(2.3, 100, "snappy")],
   });
 
-  return doc("Metrics Dashboard", 1920, 1080, DUR, "#0c1322", [
+  return doc("Metrics Dashboard", 1920, 1080, DUR, "#0b1220", [
     bg, grid, title, subtitle, ...cards, axis, ...bars,
   ]);
 }
@@ -450,22 +449,22 @@ function metricsDashboard(): SceneDocument {
 function logoSting(): SceneDocument {
   const DUR = 5;
   const c = 540;
-  const bg = shape("Backdrop", "rect", c, c, 1080, 1080, "#08070d", {
-    gradientTo: "#171033", gradientAngle: 135,
+  const bg = shape("Backdrop", "rect", c, c, 1080, 1080, "#0a0800", {
+    gradientTo: "#2e1f06", gradientAngle: 135,
   });
   // Radial burst of shards springing out then fading.
-  const shard = shape("Burst", "rect", c, c, 14, 90, "#6f8bff", {
+  const shard = shape("Burst", "rect", c, c, 14, 90, "#fbbf24", {
     r: 7,
     cloner: clonerOf({ mode: "radial", count: 18, radius: 300, faceOut: true, stepOpacity: 0, stagger: 0.012 }),
-    effects: [glow("#6f8bff", 1.2)],
+    effects: [glow("#f59e0b", 1.2)],
     as: [k(0.5, 0, "overshoot"), k(1.1, 100, "overshoot"), k(2.0, 100, "gentle"), k(2.8, 0, "easeIn")],
     aop: [k(0.5, 0, "gentle"), k(0.9, 100, "gentle"), k(2.2, 100, "gentle"), k(2.9, 0, "gentle")],
   });
   // Draw-on ring.
-  const ring = shape("Ring", "ellipse", c, c, 360, 360, "#08070d", {
-    stroke: { color: "#7c9bff", width: 10, cap: "round" },
+  const ring = shape("Ring", "ellipse", c, c, 360, 360, "#0a0800", {
+    stroke: { color: "#fcd34d", width: 10, cap: "round" },
     trimEnd: [k(0.4, 0, "settle"), k(1.6, 100, "settle")],
-    effects: [glow("#7c9bff", 1.0)],
+    effects: [glow("#f59e0b", 1.0)],
   });
   // Monogram that pops in with overshoot.
   const mark = text("Monogram", "LM", c, c + 12, 200, 800, "#ffffff", {
@@ -479,17 +478,17 @@ function logoSting(): SceneDocument {
     aop: [k(1.9, 0, "gentle"), k(2.1, 55, "gentle"), k(2.5, 0, "gentle")],
   });
   // Tagline reveal.
-  const tag = text("Tagline", "MOTION, MADE SIMPLE", c, c + 230, 34, 600, "#9fb0d8", {
+  const tag = text("Tagline", "MOTION, MADE SIMPLE", c, c + 230, 34, 600, "#e0c587", {
     letter: 10,
     aop: [k(2.4, 0, "gentle"), k(3.0, 100, "gentle")],
     ay: [k(2.4, c + 270, "settle"), k(3.0, c + 230, "settle")],
   });
-  const tagLine = shape("Underline", "rect", c, c + 290, 0, 4, "#7c9bff", {
+  const tagLine = shape("Underline", "rect", c, c + 290, 0, 4, "#fbbf24", {
     r: 2, asx: [k(2.7, 0, "snappy"), k(3.3, 100, "snappy")], anchorX: 0.5,
     // width animated via scaleX from a 360px base:
   });
   tagLine.shape!.width = 360;
-  return doc("Logo Sting", 1080, 1080, DUR, "#08070d", [bg, shard, ring, mark, sweep, tag, tagLine]);
+  return doc("Logo Sting", 1080, 1080, DUR, "#0a0800", [bg, shard, ring, mark, sweep, tag, tagLine]);
 }
 
 /** 5 — Broadcast Lower Third (16:9, 6s; slides in, holds, slides out). */
@@ -510,8 +509,8 @@ function lowerThird(): SceneDocument {
     aop: [k(0.3, 0, "gentle"), k(0.7, 100, "gentle"), k(4.9, 100, "gentle"), k(5.5, 0, "gentle")],
   });
   // Accent block wipes in at the bar's left edge.
-  const accent = shape("Accent", "rect", 282, 820, 16, 156, "#ff5a5f", {
-    anchorY: 0.5, effects: [glow("#ff5a5f", 1.0)],
+  const accent = shape("Accent", "rect", 282, 820, 16, 156, "#ef4444", {
+    anchorY: 0.5, effects: [glow("#ef4444", 1.0)],
     asy: [k(0.5, 0, "settle"), k(1.0, 100, "settle"), k(4.9, 100, "gentle"), k(5.4, 0, "easeIn")],
     aop: [k(0.4, 0, "gentle"), k(0.7, 100, "gentle"), k(4.9, 100, "gentle"), k(5.5, 0, "gentle")],
   });
@@ -524,7 +523,7 @@ function lowerThird(): SceneDocument {
     ax: [k(1.1, 530, "settle"), k(1.5, 560, "settle")],
   });
   // Animated underline (grows from the left, under the name).
-  const underline = shape("Underline", "rect", 410, 832, 300, 4, "#ff5a5f", {
+  const underline = shape("Underline", "rect", 410, 832, 300, 4, "#ef4444", {
     anchorX: 0,
     asx: [k(1.4, 0, "snappy"), k(2.0, 100, "snappy"), k(4.9, 100, "gentle"), k(5.3, 0, "easeIn")],
     aop: [k(1.4, 0, "gentle"), k(1.7, 100, "gentle"), k(4.9, 100, "gentle"), k(5.4, 0, "gentle")],
@@ -537,14 +536,14 @@ function lowerThird(): SceneDocument {
 /** 6 — Kinetic Quote (16:9, 6.5s). */
 function kineticQuote(): SceneDocument {
   const DUR = 6.5;
-  const bg = shape("Backdrop", "rect", 960, 540, 1920, 1080, "#101012", {
-    gradientTo: "#1c1430", gradientAngle: 135,
+  const bg = shape("Backdrop", "rect", 960, 540, 1920, 1080, "#160d12", {
+    gradientTo: "#341622", gradientAngle: 135,
   });
-  const blob = shape("Glow", "ellipse", 960, 540, 1100, 1100, "#5b3bff", {
-    opacity: 22, blend: "screen", effects: [bloom(1.6)],
+  const blob = shape("Glow", "ellipse", 960, 540, 1100, 1100, "#fb7185", {
+    opacity: 24, blend: "screen", effects: [bloom(1.6)],
     as: [k(0, 70, "settle"), k(2, 100, "settle")], behaviors: [wiggle("position", 0.2, 40)],
   });
-  const quoteMark = text("Quote Mark", "“", 360, 360, 320, 800, "#5b6bff", {
+  const quoteMark = text("Quote Mark", "“", 360, 360, 320, 800, "#fb7185", {
     aop: [k(0.1, 0, "gentle"), k(0.7, 70, "gentle")],
     as: [k(0.1, 60, "overshoot"), k(0.8, 100, "overshoot")],
   });
@@ -555,16 +554,16 @@ function kineticQuote(): SceneDocument {
   const line2 = text("Line 2", "what it looks like.", 960, 560, 96, 800, "#ffffff", {
     animator: { kind: "fade-up", unit: "word", stagger: 0.09, duration: 0.55, start: 1.2 },
   });
-  const line3 = text("Line 3", "It's how it moves.", 960, 690, 96, 800, "#8a9bff", {
+  const line3 = text("Line 3", "It's how it moves.", 960, 690, 96, 800, "#fb7185", {
     animator: { kind: "fade-up", unit: "word", stagger: 0.1, duration: 0.6, start: 2.1 },
   });
-  const rule = shape("Rule", "rect", 960, 820, 360, 4, "#5b6bff", {
+  const rule = shape("Rule", "rect", 960, 820, 360, 4, "#fb7185", {
     anchorX: 0.5, asx: [k(3.1, 0, "snappy"), k(3.7, 100, "snappy")],
   });
-  const author = text("Author", "— The Motion Manifesto", 960, 880, 34, 500, "#aab0c8", {
+  const author = text("Author", "— The Motion Manifesto", 960, 880, 34, 500, "#d9a8b4", {
     letter: 4, aop: [k(3.4, 0, "gentle"), k(4.0, 100, "gentle")], ay: [k(3.4, 910, "settle"), k(4.0, 880, "settle")],
   });
-  return doc("Kinetic Quote", 1920, 1080, DUR, "#101012", [
+  return doc("Kinetic Quote", 1920, 1080, DUR, "#160d12", [
     bg, blob, quoteMark, line1, line2, line3, rule, author,
   ]);
 }

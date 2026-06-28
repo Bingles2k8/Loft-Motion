@@ -135,34 +135,34 @@ export function ExamplesPanel() {
  */
 function TemplatePreview({ id }: { id: string }) {
   const grad: Record<string, string> = {
-    "tpl-aurora-promo": "from-[#0b1020] to-[#2a1d5e]",
-    "tpl-app-onboarding": "from-[#0e1226] to-[#1f3d7a]",
-    "tpl-metrics-dashboard": "from-[#0c1322] to-[#16263f]",
-    "tpl-logo-sting": "from-[#08070d] to-[#2a1d6a]",
-    "tpl-lower-third": "from-[#0b0d14] to-[#1a1f2e]",
-    "tpl-kinetic-quote": "from-[#101012] to-[#2a1f4a]",
+    "tpl-aurora-promo": "from-[#160a2e] to-[#5b2196]",
+    "tpl-app-onboarding": "from-[#04211c] to-[#0b6b58]",
+    "tpl-metrics-dashboard": "from-[#0b1220] to-[#12354a]",
+    "tpl-logo-sting": "from-[#0a0800] to-[#5a3d0a]",
+    "tpl-lower-third": "from-[#0b0d14] to-[#241016]",
+    "tpl-kinetic-quote": "from-[#160d12] to-[#5a2236]",
   };
   return (
     <div className={`relative grid h-32 place-items-center overflow-hidden bg-gradient-to-br ${grad[id] ?? "from-ink-900 to-ink-800"}`}>
       {id === "tpl-metrics-dashboard" ? (
         <div className="flex items-end gap-1.5">
           {[14, 24, 18, 30, 22].map((h, i) => (
-            <span key={i} className="lm-ex-bar w-2 rounded-sm bg-[#4f7cff]" style={{ height: h, animationDelay: `${i * 0.1}s` }} />
+            <span key={i} className="lm-ex-bar w-2 rounded-sm bg-[#22d3ee]" style={{ height: h, animationDelay: `${i * 0.1}s` }} />
           ))}
         </div>
       ) : id === "tpl-logo-sting" ? (
-        <div className="lm-ex-pulse grid h-12 w-12 place-items-center rounded-full border-2 border-[#7c9bff] text-[11px] font-bold text-white">
+        <div className="lm-ex-pulse grid h-12 w-12 place-items-center rounded-full border-2 border-[#fcd34d] text-[11px] font-bold text-white">
           LM
         </div>
       ) : id === "tpl-app-onboarding" ? (
         <div className="flex flex-col items-center gap-1.5">
-          <span className="lm-ex-pulse h-7 w-7 rounded-xl bg-[#6f8bff]" />
+          <span className="lm-ex-pulse h-7 w-7 rounded-xl bg-[#2dd4bf]" />
           <span className="h-1.5 w-16 rounded-full bg-white/40" />
           <span className="h-1.5 w-10 rounded-full bg-white/20" />
         </div>
       ) : id === "tpl-lower-third" ? (
         <div className="flex w-full items-center gap-2 px-6">
-          <span className="lm-ex-bar h-8 w-1.5 rounded bg-[#ff5a5f]" />
+          <span className="lm-ex-bar h-8 w-1.5 rounded bg-[#ef4444]" />
           <div className="flex flex-col gap-1">
             <span className="h-2 w-24 rounded-full bg-white/60" />
             <span className="h-1.5 w-16 rounded-full bg-white/25" />
@@ -172,12 +172,12 @@ function TemplatePreview({ id }: { id: string }) {
         <div className="flex flex-col items-center gap-1">
           <span className="h-2.5 w-28 rounded-full bg-white/70" />
           <span className="h-2.5 w-32 rounded-full bg-white/70" />
-          <span className="lm-ex-pulse h-2.5 w-24 rounded-full bg-[#8a9bff]" />
+          <span className="lm-ex-pulse h-2.5 w-24 rounded-full bg-[#fb7185]" />
         </div>
       ) : (
         // Aurora promo (default)
         <div className="flex flex-col items-center gap-1.5">
-          <span className="lm-ex-pulse h-10 w-16 rounded-lg bg-[#4f7cff]/70" />
+          <span className="lm-ex-pulse h-10 w-16 rounded-lg bg-[#a855f7]/80" />
           <span className="h-1.5 w-20 rounded-full bg-white/50" />
         </div>
       )}
