@@ -61,6 +61,7 @@ function cloner(over: Partial<Cloner>): Cloner {
 
 /** Browsable template categories (Figma-style gallery filtering). */
 export type ExampleCategory =
+  | "Showcase"
   | "Loading"
   | "Logo & Brand"
   | "Text"
@@ -69,6 +70,7 @@ export type ExampleCategory =
   | "Backgrounds";
 
 export const EXAMPLE_CATEGORIES: ExampleCategory[] = [
+  "Showcase",
   "Loading",
   "Logo & Brand",
   "Text",

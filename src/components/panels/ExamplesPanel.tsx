@@ -6,9 +6,14 @@ import {
   EXAMPLE_CATEGORIES,
   EXAMPLE_PROJECTS,
   type ExampleCategory,
+  type ExampleProject,
 } from "@/lib/scene/examples";
+import { TEMPLATE_PROJECTS } from "@/lib/scene/templates";
 
 type Filter = "All" | ExampleCategory;
+
+/** Featured finished projects first, then the simpler building blocks. */
+const ALL_PROJECTS: ExampleProject[] = [...TEMPLATE_PROJECTS, ...EXAMPLE_PROJECTS];
 
 /**
  * Template gallery — a browsable, categorised set of ready-made projects, in the
@@ -19,13 +24,13 @@ export function ExamplesPanel() {
   const show = useStore((s) => s.showExamples);
   const setShow = useStore((s) => s.setShowExamples);
   const loadScene = useStore((s) => s.loadScene);
-  const [filter, setFilter] = useState<Filter>("All");
+  const [filter, setFilter] = useState<Filter>("Showcase");
 
   const visible = useMemo(
     () =>
       filter === "All"
-        ? EXAMPLE_PROJECTS
-        : EXAMPLE_PROJECTS.filter((e) => e.category === filter),
+        ? ALL_PROJECTS
+        : ALL_PROJECTS.filter((e) => e.category === filter),
     [filter],
   );
 
@@ -46,7 +51,8 @@ export function ExamplesPanel() {
           <div>
             <h2 className="text-sm font-bold text-haze-200">Template Gallery</h2>
             <p className="text-[11px] text-haze-500">
-              Ready-made motion templates. Filter by category and click to load.
+              Finished projects to open and remix, plus simpler building blocks.
+              Filter by category and click to load.
             </p>
           </div>
           <button
@@ -75,36 +81,106 @@ export function ExamplesPanel() {
         </div>
 
         <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-5 sm:grid-cols-3">
-          {visible.map((ex) => (
-            <button
-              key={ex.id}
-              onClick={() => {
-                loadScene(ex.build());
-                setShow(false);
-              }}
-              className="group flex flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-800 text-left transition hover:border-brand-500/60 hover:bg-ink-750"
-            >
-              <ExamplePreview id={ex.id} />
-              <div className="p-2.5">
-                <div className="text-xs font-semibold text-haze-200">{ex.name}</div>
-                <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-haze-500">
-                  {ex.blurb}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {ex.tools.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded bg-ink-700 px-1.5 py-0.5 text-[9px] text-haze-400"
-                    >
-                      {t}
-                    </span>
-                  ))}
+          {visible.map((ex) => {
+            const featured = ex.category === "Showcase";
+            return (
+              <button
+                key={ex.id}
+                onClick={() => {
+                  loadScene(ex.build());
+                  setShow(false);
+                }}
+                className="group flex flex-col overflow-hidden rounded-xl border border-ink-700 bg-ink-800 text-left transition hover:border-brand-500/60 hover:bg-ink-750"
+              >
+                {featured ? (
+                  <TemplatePreview id={ex.id} />
+                ) : (
+                  <ExamplePreview id={ex.id} />
+                )}
+                <div className="p-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-xs font-semibold text-haze-200">{ex.name}</div>
+                    {featured && (
+                      <span className="rounded bg-brand-500/15 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-brand-500">
+                        Template
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-haze-500">
+                    {ex.blurb}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {ex.tools.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded bg-ink-700 px-1.5 py-0.5 text-[9px] text-haze-400"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Richer, gradient-backed preview for the finished-project templates — a tiny
+ * looping mockup that hints at each one's composition.
+ */
+function TemplatePreview({ id }: { id: string }) {
+  const grad: Record<string, string> = {
+    "tpl-aurora-promo": "from-[#0b1020] to-[#2a1d5e]",
+    "tpl-app-onboarding": "from-[#0e1226] to-[#1f3d7a]",
+    "tpl-metrics-dashboard": "from-[#0c1322] to-[#16263f]",
+    "tpl-logo-sting": "from-[#08070d] to-[#2a1d6a]",
+    "tpl-lower-third": "from-[#0b0d14] to-[#1a1f2e]",
+    "tpl-kinetic-quote": "from-[#101012] to-[#2a1f4a]",
+  };
+  return (
+    <div className={`relative grid h-32 place-items-center overflow-hidden bg-gradient-to-br ${grad[id] ?? "from-ink-900 to-ink-800"}`}>
+      {id === "tpl-metrics-dashboard" ? (
+        <div className="flex items-end gap-1.5">
+          {[14, 24, 18, 30, 22].map((h, i) => (
+            <span key={i} className="lm-ex-bar w-2 rounded-sm bg-[#4f7cff]" style={{ height: h, animationDelay: `${i * 0.1}s` }} />
+          ))}
+        </div>
+      ) : id === "tpl-logo-sting" ? (
+        <div className="lm-ex-pulse grid h-12 w-12 place-items-center rounded-full border-2 border-[#7c9bff] text-[11px] font-bold text-white">
+          LM
+        </div>
+      ) : id === "tpl-app-onboarding" ? (
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="lm-ex-pulse h-7 w-7 rounded-xl bg-[#6f8bff]" />
+          <span className="h-1.5 w-16 rounded-full bg-white/40" />
+          <span className="h-1.5 w-10 rounded-full bg-white/20" />
+        </div>
+      ) : id === "tpl-lower-third" ? (
+        <div className="flex w-full items-center gap-2 px-6">
+          <span className="lm-ex-bar h-8 w-1.5 rounded bg-[#ff5a5f]" />
+          <div className="flex flex-col gap-1">
+            <span className="h-2 w-24 rounded-full bg-white/60" />
+            <span className="h-1.5 w-16 rounded-full bg-white/25" />
+          </div>
+        </div>
+      ) : id === "tpl-kinetic-quote" ? (
+        <div className="flex flex-col items-center gap-1">
+          <span className="h-2.5 w-28 rounded-full bg-white/70" />
+          <span className="h-2.5 w-32 rounded-full bg-white/70" />
+          <span className="lm-ex-pulse h-2.5 w-24 rounded-full bg-[#8a9bff]" />
+        </div>
+      ) : (
+        // Aurora promo (default)
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="lm-ex-pulse h-10 w-16 rounded-lg bg-[#4f7cff]/70" />
+          <span className="h-1.5 w-20 rounded-full bg-white/50" />
+        </div>
+      )}
     </div>
   );
 }
