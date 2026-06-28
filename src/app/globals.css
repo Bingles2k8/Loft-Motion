@@ -1,43 +1,81 @@
 @import "tailwindcss";
 
 /*
- * Loft Motion design system — a neutral, professional dark-grey studio theme
- * modelled on After Effects. No gradients, no purple/blue washes: just a clean
- * grey scale with a single restrained steel-blue accent used sparingly for
- * selection and active states.
+ * Loft Motion design system — UI3.
+ *
+ * Two themes share one set of semantic tokens. The DEFAULT is a light, airy,
+ * Figma-inspired studio (white panels, light-grey chrome, a single confident
+ * blue accent). A dark theme — the original After Effects / Spectrum studio —
+ * is preserved verbatim under [data-theme="dark"].
+ *
+ * Token names are historical: `ink-*` = surfaces (light→dark), `haze-*` = text
+ * (dark→light). In light mode the values invert; the names stay so the hundreds
+ * of `bg-ink-*` / `text-haze-*` utilities across the app re-theme for free.
+ *
+ * @theme holds the LIGHT (default) palette so Tailwind generates the utilities
+ * and seeds :root. The dark block below overrides the same custom properties.
  */
 @theme {
-  /* Neutral grey scale modelled on After Effects / Adobe Spectrum dark. */
-  --color-ink-950: #0f0f0f; /* seams between panels, viewer void */
-  --color-ink-900: #1b1b1b; /* app background */
-  --color-ink-850: #212121; /* panel background */
-  --color-ink-800: #262626; /* panel body / sub-surface */
-  --color-ink-750: #2b2b2b; /* header strips, column headers */
-  --color-ink-700: #323232; /* rows, inputs at rest */
-  --color-ink-650: #383838; /* raised control face */
-  --color-ink-600: #444444; /* control hover / borders */
-  --color-ink-500: #545454; /* raised borders, handles */
+  /* Surfaces — light, Figma UI3. */
+  --color-ink-950: #d9d9dd; /* deepest seams / canvas void */
+  --color-ink-900: #f4f4f6; /* app background */
+  --color-ink-850: #ffffff; /* panel background (white) */
+  --color-ink-800: #fbfbfc; /* panel body / sub-surface */
+  --color-ink-750: #f1f1f3; /* header strips, column headers */
+  --color-ink-700: #e9e9ec; /* rows, inputs at rest / hairline borders */
+  --color-ink-650: #e2e2e6; /* raised control face */
+  --color-ink-600: #d4d4d9; /* control hover / borders */
+  --color-ink-500: #bcbcc3; /* raised borders, handles */
 
-  /* Text greys */
+  /* Text — dark on light. */
+  --color-haze-200: #1d1d1f; /* primary text */
+  --color-haze-300: #46464a;
+  --color-haze-400: #6a6a70;
+  --color-haze-500: #8c8c93; /* secondary text */
+
+  /* Single accent — Figma's confident blue (selection / CTI / interactions). */
+  --color-brand-600: #0c8ce9;
+  --color-brand-500: #0d99ff;
+  --color-brand-400: #3dabff;
+  --color-brand-300: #6dbdff;
+  --color-brand-tint: #e6f4ff; /* pale-blue selected-row fill */
+
+  /* Content/status colors (semantic, tuned for light). */
+  --color-mint-400: #0e9aa7;
+  --color-rose-400: #d6336c;
+  --color-amber-400: #b3801f;
+  --color-emerald-400: #2f9e6b;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Dark theme — original AE / Adobe Spectrum studio, opt-in. */
+html[data-theme="dark"] {
+  --color-ink-950: #0f0f0f;
+  --color-ink-900: #1b1b1b;
+  --color-ink-850: #212121;
+  --color-ink-800: #262626;
+  --color-ink-750: #2b2b2b;
+  --color-ink-700: #323232;
+  --color-ink-650: #383838;
+  --color-ink-600: #444444;
+  --color-ink-500: #545454;
+
   --color-haze-200: #e8e8e8;
   --color-haze-300: #b6b6b6;
   --color-haze-400: #8c8c8c;
   --color-haze-500: #6e6e6e;
 
-  /* Single accent — AE's desaturated steel blue (selection / CTI). */
   --color-brand-600: #2d6cb4;
   --color-brand-500: #3a7cc0;
   --color-brand-400: #4f8fcb;
   --color-brand-300: #79aede;
-  --color-brand-tint: #2c3a47; /* blue-tinted selected-row fill */
+  --color-brand-tint: #2c3a47;
 
-  /* Content/status colors (muted, semantic). */
   --color-mint-400: #58c8d6;
   --color-rose-400: #d96a8f;
   --color-amber-400: #d6a14f;
   --color-emerald-400: #5cb88a;
-
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 html,

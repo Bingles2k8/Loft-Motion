@@ -16,6 +16,13 @@ import { createBehavior, createCloner, createEffect, kf as makeKf } from "@/lib/
 import { EFFECT_LIST, effectDef } from "@/lib/effects/catalog";
 import { BEHAVIOR_LIST, behaviorDef } from "@/lib/anim/behaviorCatalog";
 import { applyPreset, BEHAVIOR_PRESETS } from "@/lib/anim/behaviors";
+import {
+  SPRING_PRESETS,
+  SPRING_PRESET_LABELS,
+  SPRING_PRESET_PARAMS,
+  springResponse,
+  springSettleTime,
+} from "@/lib/anim/spring";
 import { AUTO_ANIMATE_LABELS, AUTO_ANIMATE_PRESETS } from "@/lib/anim/autoAnimate";
 import {
   CLONER_MODES,
@@ -51,17 +58,56 @@ import { IconChevron, IconKey, IconPlus, IconTrash } from "@/components/ui/icons
 
 type TextAlign = (typeof TEXT_ALIGN)[number];
 
+type PanelTab = "design" | "motion";
+
 export function PropertiesPanel() {
   const selectedLayerId = useStore((s) => s.selectedLayerId);
   const selectedKeys = useStore((s) => s.selectedKeys);
   const scene = useStore((s) => s.scene);
   const layer = scene.layers.find((l) => l.id === selectedLayerId) ?? null;
+  const [tab, setTab] = useState<PanelTab>("design");
 
   return (
-    <aside className="flex h-full flex-col overflow-y-auto border-l border-ink-700 bg-ink-850">
-      {selectedKeys.length > 0 && <KeyframeEditor />}
-      {layer ? <LayerProperties layer={layer} /> : <CompositionProperties />}
+    <aside className="flex h-full flex-col border-l border-ink-700 bg-ink-850">
+      {/* Design / Motion tabs — mirrors Figma's right-sidebar split. */}
+      <div className="flex shrink-0 border-b border-ink-700 px-2 pt-1.5">
+        {(["design", "motion"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`relative px-3 py-1.5 text-xs font-semibold capitalize transition ${
+              tab === t ? "text-haze-200" : "text-haze-500 hover:text-haze-300"
+            }`}
+          >
+            {t}
+            {tab === t && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-500" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {selectedKeys.length > 0 && <KeyframeEditor />}
+        {layer ? (
+          <LayerProperties layer={layer} tab={tab} />
+        ) : tab === "design" ? (
+          <CompositionProperties />
+        ) : (
+          <MotionEmptyState />
+        )}
+      </div>
     </aside>
+  );
+}
+
+function MotionEmptyState() {
+  return (
+    <div className="px-3 py-4 text-[11px] leading-relaxed text-haze-500">
+      Select a layer to animate it. The Motion tab gathers Auto-Animate,
+      Behaviors and per-format export compatibility. Switch to Motion mode
+      (<kbd className="rounded bg-ink-700 px-1">⇧E</kbd>) for the timeline.
+    </div>
   );
 }
 
@@ -196,14 +242,49 @@ function CurveThumb({ bezier }: { bezier: [number, number, number, number] }) {
   const sy = (y: number) => H - pad - y * (H - 2 * pad);
   return (
     <svg width={W} height={H} className="shrink-0 rounded bg-ink-900 ring-1 ring-ink-700">
-      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="#2b2b2b" />
-      <line x1={sx(0)} y1={sy(1)} x2={sx(1)} y2={sy(1)} stroke="#2b2b2b" />
+      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="var(--color-ink-700)" />
+      <line x1={sx(0)} y1={sy(1)} x2={sx(1)} y2={sy(1)} stroke="var(--color-ink-700)" />
       <path
         d={`M ${sx(0)} ${sy(0)} C ${sx(x1)} ${sy(y1)}, ${sx(x2)} ${sy(y2)}, ${sx(1)} ${sy(1)}`}
         fill="none"
-        stroke="#4f8fcb"
+        stroke="var(--color-brand-500)"
         strokeWidth={1.5}
       />
+    </svg>
+  );
+}
+
+/** Live preview of a spring's normalised step response (overshoot included). */
+function SpringGraph({
+  stiffness,
+  damping,
+  mass,
+}: {
+  stiffness: number;
+  damping: number;
+  mass: number;
+}) {
+  const W = 196;
+  const H = 56;
+  const pad = 6;
+  const p = { stiffness, damping, mass };
+  const dur = springSettleTime(p);
+  const N = 64;
+  // Sample, then frame the curve so overshoot stays visible.
+  const ys: number[] = [];
+  for (let i = 0; i <= N; i++) ys.push(springResponse((i / N) * dur, p));
+  const lo = Math.min(0, ...ys);
+  const hi = Math.max(1, ...ys);
+  const sx = (i: number) => pad + (i / N) * (W - 2 * pad);
+  const sy = (y: number) => H - pad - ((y - lo) / (hi - lo || 1)) * (H - 2 * pad);
+  const d = ys.map((y, i) => `${i === 0 ? "M" : "L"} ${sx(i).toFixed(1)} ${sy(y).toFixed(1)}`).join(" ");
+  const settledY = sy(1);
+
+  return (
+    <svg width={W} height={H} className="w-full rounded bg-ink-900 ring-1 ring-ink-700">
+      {/* settle line (value = 1) */}
+      <line x1={pad} y1={settledY} x2={W - pad} y2={settledY} stroke="var(--color-ink-700)" strokeDasharray="3 3" />
+      <path d={d} fill="none" stroke="var(--color-brand-500)" strokeWidth={1.5} />
     </svg>
   );
 }
@@ -285,7 +366,7 @@ function ChannelField({ layer, channel }: { layer: Layer; channel: ChannelDef })
 
 /* -------------------------------------------------------------------------- */
 
-function LayerProperties({ layer }: { layer: Layer }) {
+function LayerProperties({ layer, tab }: { layer: Layer; tab: PanelTab }) {
   const updateLayer = useStore((s) => s.updateLayer);
   const removeLayer = useStore((s) => s.removeLayer);
   const duplicateLayer = useStore((s) => s.duplicateLayer);
@@ -294,6 +375,18 @@ function LayerProperties({ layer }: { layer: Layer }) {
   const set = (patch: (l: Layer) => void) => updateLayer(layer.id, patch);
   const shape = layer.shape;
   const text = layer.text;
+
+  // The Motion tab focuses on animation: Auto-Animate, Behaviors and the
+  // honest per-format export report. Everything structural lives in Design.
+  if (tab === "motion") {
+    return (
+      <>
+        <AutoAnimateSection layer={layer} />
+        <BehaviorsSection layer={layer} />
+        <CapabilitySection layer={layer} scene={scene} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -378,7 +471,6 @@ function LayerProperties({ layer }: { layer: Layer }) {
       </Section>
 
       <AlignSection layer={layer} />
-      <AutoAnimateSection layer={layer} />
 
       <Section title="Transform" collapsible>
         {TRANSFORM_CHANNELS.map((c) => (
@@ -508,10 +600,8 @@ function LayerProperties({ layer }: { layer: Layer }) {
 
       {layer.type === "text" && text && <TextSection layer={layer} />}
 
-      <BehaviorsSection layer={layer} />
       <ClonerSection layer={layer} />
       <EffectsSection layer={layer} />
-      <CapabilitySection layer={layer} scene={scene} />
     </>
   );
 }
@@ -981,6 +1071,36 @@ function BehaviorCard({
               </button>
             ))}
           </div>
+
+          {/* Spring — Figma-style named presets + a live response graph. */}
+          {b.type === "spring" && (
+            <div className="space-y-1.5 rounded-md border border-ink-700 p-1.5">
+              <div className="grid grid-cols-4 gap-1">
+                {SPRING_PRESETS.map((sp) => (
+                  <button
+                    key={sp}
+                    onClick={() =>
+                      updateBehavior(layerId, behaviorId, (x) => {
+                        x.params = { ...x.params, ...SPRING_PRESET_PARAMS[sp] };
+                      })
+                    }
+                    className="rounded bg-ink-700 py-0.5 text-[10px] text-haze-300 transition hover:bg-ink-600 hover:text-haze-100"
+                  >
+                    {SPRING_PRESET_LABELS[sp]}
+                  </button>
+                ))}
+              </div>
+              <SpringGraph
+                stiffness={b.params.stiffness ?? 170}
+                damping={b.params.damping ?? 12}
+                mass={b.params.mass ?? 1}
+              />
+              <p className="text-[10px] leading-snug text-haze-500">
+                Springs render exactly in preview &amp; MP4. CSS/Lottie bake the
+                motion per-frame (no single easing curve can describe a bounce).
+              </p>
+            </div>
+          )}
           {/* Target + strength */}
           <Row>
             <Label>Apply to</Label>

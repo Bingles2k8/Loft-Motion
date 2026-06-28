@@ -88,6 +88,24 @@ function loadSizes(): PanelSizes {
 
 export type LeftTab = "project" | "effects" | "behaviors" | "palette";
 
+/** UI3-style colour theme. Light is the default identity (Figma-like). */
+export type Theme = "light" | "dark";
+/** Editor mode — Design lets the canvas breathe; Motion reveals the timeline. */
+export type EditorMode = "design" | "motion";
+
+const THEME_KEY = "loft.theme.v1";
+
+function loadTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  try {
+    const raw = window.localStorage.getItem(THEME_KEY);
+    if (raw === "light" || raw === "dark") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "light";
+}
+
 export interface StoreState {
   scene: SceneDocument;
   past: SceneDocument[];
@@ -119,6 +137,10 @@ export interface StoreState {
   // Layout
   sizes: PanelSizes;
   leftTab: LeftTab;
+
+  // Look & mode (UI3)
+  theme: Theme;
+  mode: EditorMode;
 
   // Dialogs / side panels
   activeTarget: ExportTarget;
@@ -222,6 +244,10 @@ export interface StoreState {
   setExpanded: (id: string, v: boolean) => void;
   toggleGraphMode: () => void;
   setLeftTab: (t: LeftTab) => void;
+  setTheme: (t: Theme) => void;
+  toggleTheme: () => void;
+  setMode: (m: EditorMode) => void;
+  toggleMode: () => void;
   setPanelSize: (key: keyof PanelSizes, value: number) => void;
   setActiveTarget: (t: ExportTarget) => void;
   setShowPrinciples: (v: boolean) => void;
@@ -297,6 +323,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   sizes: loadSizes(),
   leftTab: "project",
+  theme: loadTheme(),
+  mode: "motion",
 
   activeTarget: "mp4",
   showPrinciples: false,
@@ -704,6 +732,20 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({ expanded: { ...s.expanded, [id]: v } })),
   toggleGraphMode: () => set((s) => ({ graphMode: !s.graphMode })),
   setLeftTab: (t) => set({ leftTab: t }),
+
+  setTheme: (t) => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(THEME_KEY, t);
+      } catch {
+        /* ignore */
+      }
+    }
+    set({ theme: t });
+  },
+  toggleTheme: () => get().setTheme(get().theme === "light" ? "dark" : "light"),
+  setMode: (m) => set({ mode: m }),
+  toggleMode: () => set((s) => ({ mode: s.mode === "design" ? "motion" : "design" })),
 
   setPanelSize: (key, value) =>
     set((state) => {

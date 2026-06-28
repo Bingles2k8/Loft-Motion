@@ -3,12 +3,6 @@
 import { useRef } from "react";
 import { useStore } from "@/lib/store/useStore";
 import {
-  createAdjustmentLayer,
-  createNullLayer,
-  createShapeLayer,
-  createTextLayer,
-} from "@/lib/scene/factory";
-import {
   classifyFile,
   downloadSceneJson,
   importSceneJson,
@@ -17,19 +11,11 @@ import {
 } from "@/lib/io/file";
 import { createAsset, createImageLayerFromAsset } from "@/lib/scene/factory";
 import {
-  IconCircle,
   IconDownload,
   IconLayers,
-  IconAdjust,
   IconGrid,
   IconMenu,
-  IconNull,
-  IconRedo,
   IconSpark,
-  IconSquare,
-  IconStar,
-  IconText,
-  IconUndo,
   IconUpload,
 } from "@/components/ui/icons";
 
@@ -57,11 +43,6 @@ function ToolButton({
 }
 
 export function Toolbar() {
-  const addLayer = useStore((s) => s.addLayer);
-  const undo = useStore((s) => s.undo);
-  const redo = useStore((s) => s.redo);
-  const canUndo = useStore((s) => s.past.length > 0);
-  const canRedo = useStore((s) => s.future.length > 0);
   const loadScene = useStore((s) => s.loadScene);
   const name = useStore((s) => s.scene.name);
   const update = useStore((s) => s.update);
@@ -128,40 +109,6 @@ export function Toolbar() {
           Loft Motion
         </span>
       </div>
-
-      <div className="mx-1 h-5 w-px bg-ink-700" />
-
-      {/* Add layers */}
-      <div className="flex items-center gap-0.5">
-        <ToolButton title="Add rectangle" onClick={() => addLayer(createShapeLayer("rect"))}>
-          <IconSquare />
-        </ToolButton>
-        <ToolButton title="Add ellipse" onClick={() => addLayer(createShapeLayer("ellipse"))}>
-          <IconCircle />
-        </ToolButton>
-        <ToolButton title="Add star" onClick={() => addLayer(createShapeLayer("star"))}>
-          <IconStar />
-        </ToolButton>
-        <ToolButton title="Add text" onClick={() => addLayer(createTextLayer())}>
-          <IconText />
-        </ToolButton>
-        <ToolButton title="Add null (transform controller)" onClick={() => addLayer(createNullLayer())}>
-          <IconNull />
-        </ToolButton>
-        <ToolButton title="Add adjustment layer" onClick={() => addLayer(createAdjustmentLayer())}>
-          <IconAdjust />
-        </ToolButton>
-      </div>
-
-      <div className="mx-1 h-5 w-px bg-ink-700" />
-
-      {/* History */}
-      <ToolButton title="Undo (⌘Z)" onClick={undo} disabled={!canUndo}>
-        <IconUndo />
-      </ToolButton>
-      <ToolButton title="Redo (⌘⇧Z)" onClick={redo} disabled={!canRedo}>
-        <IconRedo />
-      </ToolButton>
 
       {/* Project name */}
       <div className="mx-2 flex-1">

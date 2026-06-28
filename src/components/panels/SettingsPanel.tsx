@@ -31,6 +31,8 @@ export function SettingsPanel() {
   const setAutoKeyframe = useStore((s) => s.setAutoKeyframe);
   const showSafeZones = useStore((s) => s.showSafeZones);
   const setShowSafeZones = useStore((s) => s.setShowSafeZones);
+  const theme = useStore((s) => s.theme);
+  const setTheme = useStore((s) => s.setTheme);
 
   if (!show) return null;
   const c = scene.composition;
@@ -144,6 +146,27 @@ export function SettingsPanel() {
                 value={c.background}
                 onChange={(v) => setC((x) => (x.background = v))}
               />
+            </Row>
+          </Section>
+
+          <Section title="Appearance">
+            <Row>
+              <Label>Theme</Label>
+              <div className="flex w-full overflow-hidden rounded-md border border-ink-600">
+                {(["light", "dark"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTheme(t)}
+                    className={`flex-1 px-2 py-1 text-xs font-medium capitalize transition ${
+                      theme === t
+                        ? "bg-brand-500 text-white"
+                        : "bg-ink-800 text-haze-400 hover:bg-ink-700 hover:text-haze-200"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </Row>
           </Section>
 
