@@ -6,6 +6,13 @@ import { evalAnimatable } from "@/lib/anim/evaluate";
 import { layerLevelFor } from "@/lib/capability/engine";
 import { getChannel, type ChannelDef } from "@/lib/scene/paths";
 import { kf as makeKf } from "@/lib/scene/factory";
+import {
+  MOTION_PRESETS,
+  MOTION_PRESET_BLURBS,
+  MOTION_PRESET_LABELS,
+  applyMotionPreset,
+  type MotionPreset,
+} from "@/lib/anim/presets";
 import { LABEL_COLORS, type Layer } from "@/lib/scene/schema";
 import { CompatBadge } from "@/components/ui/compat";
 import { Splitter } from "@/components/ui/Splitter";
@@ -75,6 +82,21 @@ export function Timeline() {
   const labelW = useStore((s) => s.sizes.timelineLabels);
   const setPanelSize = useStore((s) => s.setPanelSize);
   const selectedKeys = useStore((s) => s.selectedKeys);
+  const selectedLayerId = useStore((s) => s.selectedLayerId);
+  const update = useStore((s) => s.update);
+  const autoKeyframe = useStore((s) => s.autoKeyframe);
+  const setAutoKeyframe = useStore((s) => s.setAutoKeyframe);
+  const [presetOpen, setPresetOpen] = useState(false);
+
+  // Drop a preset animation onto the selected layer at the playhead.
+  const applyPreset = (preset: MotionPreset) => {
+    if (!selectedLayerId) return;
+    update((s) => {
+      const l = s.layers.find((x) => x.id === selectedLayerId);
+      if (l) applyMotionPreset(l, preset, { at: time });
+    });
+    setPresetOpen(false);
+  };
 
   const duration = scene.composition.duration;
   const fps = scene.composition.fps;
@@ -186,6 +208,48 @@ export function Timeline() {
           <span className="text-haze-200">{fmtTime(time)}</span>
           <span className="text-haze-500"> / {fmtTime(duration)}</span>
         </div>
+
+        {/* Preset animations — drop at the playhead (Figma Motion-style) */}
+        <div className="relative">
+          <button
+            disabled={!selectedLayerId}
+            onClick={() => setPresetOpen((o) => !o)}
+            title={selectedLayerId ? "Add a preset animation at the playhead" : "Select a layer first"}
+            className="flex h-7 items-center gap-1 rounded px-2 text-xs font-medium text-haze-300 transition hover:bg-ink-700 hover:text-haze-200 disabled:opacity-30"
+          >
+            ✦ Animate
+          </button>
+          {presetOpen && selectedLayerId && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setPresetOpen(false)} />
+              <div className="absolute left-0 top-8 z-40 w-48 overflow-hidden rounded-lg border border-ink-600 bg-ink-850 py-1 shadow-xl">
+                {MOTION_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => applyPreset(p)}
+                    className="block w-full px-3 py-1.5 text-left transition hover:bg-ink-700"
+                  >
+                    <span className="text-xs font-medium text-haze-200">
+                      {MOTION_PRESET_LABELS[p]}
+                    </span>
+                    <span className="block text-[10px] leading-snug text-haze-500">
+                      {MOTION_PRESET_BLURBS[p]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Auto-keyframe — record transform changes at the playhead */}
+        <TransportButton
+          active={autoKeyframe}
+          onClick={() => setAutoKeyframe(!autoKeyframe)}
+          title="Auto-keyframe: record transform changes as keyframes at the playhead"
+        >
+          <IconStopwatch />
+        </TransportButton>
 
         <div className="flex-1" />
 
