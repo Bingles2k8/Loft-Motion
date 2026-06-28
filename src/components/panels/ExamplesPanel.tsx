@@ -8,35 +8,35 @@ import {
   type ExampleCategory,
   type ExampleProject,
 } from "@/lib/scene/examples";
-import { TEMPLATE_PROJECTS } from "@/lib/scene/templates";
+import { TEMPLATE_PROJECTS, MICRO_PRESET_PROJECTS } from "@/lib/scene/templates";
 
+type Mode = "templates" | "presets";
 type Filter = "All" | ExampleCategory;
 
-/** Featured finished projects first, then the simpler building blocks. */
-const ALL_PROJECTS: ExampleProject[] = [...TEMPLATE_PROJECTS, ...EXAMPLE_PROJECTS];
+/** Presets = UI micro-interactions + the simple procedural building blocks. */
+const PRESET_PROJECTS: ExampleProject[] = [...MICRO_PRESET_PROJECTS, ...EXAMPLE_PROJECTS];
+const PRESET_FILTERS: Filter[] = ["All", ...EXAMPLE_CATEGORIES.filter((c) => c !== "Showcase")];
 
 /**
- * Template gallery — a browsable, categorised set of ready-made projects, in the
- * spirit of Figma Community templates. Filter by category; click to load one as
- * the current scene (replacing the project).
+ * Gallery — finished multi-scene **Templates** vs single-concept **Presets**
+ * (UI micro-interactions + building blocks). Click any item to load it as the
+ * current scene.
  */
 export function ExamplesPanel() {
   const show = useStore((s) => s.showExamples);
   const setShow = useStore((s) => s.setShowExamples);
   const loadScene = useStore((s) => s.loadScene);
-  const [filter, setFilter] = useState<Filter>("Showcase");
+  const [mode, setMode] = useState<Mode>("templates");
+  const [filter, setFilter] = useState<Filter>("All");
 
-  const visible = useMemo(
-    () =>
-      filter === "All"
-        ? ALL_PROJECTS
-        : ALL_PROJECTS.filter((e) => e.category === filter),
-    [filter],
-  );
+  const visible = useMemo(() => {
+    if (mode === "templates") return TEMPLATE_PROJECTS;
+    return filter === "All"
+      ? PRESET_PROJECTS
+      : PRESET_PROJECTS.filter((e) => e.category === filter);
+  }, [mode, filter]);
 
   if (!show) return null;
-
-  const filters: Filter[] = ["All", ...EXAMPLE_CATEGORIES];
 
   return (
     <div
@@ -49,10 +49,11 @@ export function ExamplesPanel() {
       >
         <div className="flex items-center justify-between border-b border-ink-700 px-5 py-3.5">
           <div>
-            <h2 className="text-sm font-bold text-haze-200">Template Gallery</h2>
+            <h2 className="text-sm font-bold text-haze-200">Gallery</h2>
             <p className="text-[11px] text-haze-500">
-              Finished projects to open and remix, plus simpler building blocks.
-              Filter by category and click to load.
+              {mode === "templates"
+                ? "Finished, multi-scene animations — open one and make it yours."
+                : "Single-concept presets and building blocks to drop in and tweak."}
             </p>
           </div>
           <button
@@ -63,26 +64,44 @@ export function ExamplesPanel() {
           </button>
         </div>
 
-        {/* Category filter chips */}
-        <div className="flex flex-wrap gap-1.5 border-b border-ink-700 px-5 py-2.5">
-          {filters.map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                filter === f
-                  ? "bg-brand-500 text-white"
-                  : "bg-ink-800 text-haze-400 hover:bg-ink-700 hover:text-haze-200"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        {/* Templates ⇄ Presets toggle (+ category chips in Presets) */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink-700 px-5 py-2.5">
+          <div className="flex rounded-lg bg-ink-800 p-0.5">
+            {(["templates", "presets"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold capitalize transition ${
+                  mode === m ? "bg-brand-500 text-white shadow-sm" : "text-haze-400 hover:text-haze-200"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          {mode === "presets" && (
+            <div className="flex flex-1 flex-wrap gap-1.5">
+              {PRESET_FILTERS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                    filter === f
+                      ? "bg-brand-500/90 text-white"
+                      : "bg-ink-800 text-haze-400 hover:bg-ink-700 hover:text-haze-200"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-5 sm:grid-cols-3">
           {visible.map((ex) => {
-            const featured = ex.category === "Showcase";
+            const isTemplate = mode === "templates";
+            const useTplPreview = ex.id.startsWith("tpl-");
             return (
               <button
                 key={ex.id}
@@ -92,15 +111,11 @@ export function ExamplesPanel() {
                 }}
                 className="group flex flex-col overflow-hidden rounded-xl border border-ink-700 bg-ink-800 text-left transition hover:border-brand-500/60 hover:bg-ink-750"
               >
-                {featured ? (
-                  <TemplatePreview id={ex.id} />
-                ) : (
-                  <ExamplePreview id={ex.id} />
-                )}
+                {useTplPreview ? <TemplatePreview id={ex.id} /> : <ExamplePreview id={ex.id} />}
                 <div className="p-2.5">
                   <div className="flex items-center gap-1.5">
                     <div className="text-xs font-semibold text-haze-200">{ex.name}</div>
-                    {featured && (
+                    {isTemplate && (
                       <span className="rounded bg-brand-500/15 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-brand-500">
                         Template
                       </span>
