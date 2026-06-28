@@ -42,6 +42,16 @@ export function getChannel(layer: Layer, path: string): Animatable | null {
   return null;
 }
 
+/** Trim-path channels (draw-on) — surfaced as lanes only when trim is on. */
+export function trimChannels(layer: Layer): ChannelDef[] {
+  if (!layer.shape?.trim?.enabled) return [];
+  return [
+    { path: "shape.trim.start", label: "Trim Start", unit: "%", min: 0, max: 100 },
+    { path: "shape.trim.end", label: "Trim End", unit: "%", min: 0, max: 100 },
+    { path: "shape.trim.offset", label: "Trim Offset", unit: "°" },
+  ];
+}
+
 /** Effect param channels for a layer, for the deep timeline + properties. */
 export function effectChannels(layer: Layer): ChannelDef[] {
   const defs: ChannelDef[] = [];
