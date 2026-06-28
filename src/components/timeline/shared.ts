@@ -5,15 +5,16 @@ import type { Layer } from "@/lib/scene/schema";
 import {
   TRANSFORM_CHANNELS,
   effectChannels,
+  trimChannels,
   type ChannelDef,
 } from "@/lib/scene/paths";
 
 export const ROW_H = 28;
 export const RULER_H = 26;
 
-/** All channel rows shown for an expanded layer (transform + effect params). */
+/** All channel rows shown for an expanded layer (transform + trim + effects). */
 export function layerChannels(layer: Layer): ChannelDef[] {
-  return [...TRANSFORM_CHANNELS, ...effectChannels(layer)];
+  return [...TRANSFORM_CHANNELS, ...trimChannels(layer), ...effectChannels(layer)];
 }
 
 /** Attach window pointer move/up listeners for a drag gesture. */

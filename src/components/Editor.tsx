@@ -32,6 +32,32 @@ export function Editor() {
     else delete root.dataset.theme;
   }, [theme]);
 
+  // Dev-only test hook so an automated browser harness can load + validate
+  // templates/examples without clicking through the UI. Never attached in prod.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    let cancelled = false;
+    (async () => {
+      const [{ TEMPLATE_PROJECTS }, { EXAMPLE_PROJECTS }, { safeParseScene }] =
+        await Promise.all([
+          import("@/lib/scene/templates"),
+          import("@/lib/scene/examples"),
+          import("@/lib/scene/schema"),
+        ]);
+      if (cancelled) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__loft = {
+        store: useStore,
+        templates: TEMPLATE_PROJECTS,
+        examples: EXAMPLE_PROJECTS,
+        safeParseScene,
+      };
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Playback loop — advances the playhead off the store directly so it doesn't
   // thrash React. The renderer reacts to `time` via Stage.
   useEffect(() => {

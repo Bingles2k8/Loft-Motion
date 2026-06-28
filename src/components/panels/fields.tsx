@@ -166,7 +166,7 @@ export function NumberInput({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
-        className={`w-full rounded border bg-ink-900 px-2 py-1 text-xs tabular-nums focus:outline-none ${
+        className={`w-full rounded-md border bg-ink-900 px-2 py-1 text-xs tabular-nums transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/25 ${
           editing
             ? "border-brand-400 text-haze-200"
             : "border-ink-600 text-haze-200 hover:border-ink-500"
@@ -234,7 +234,7 @@ export function ColorInput({
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
+          className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
         />
       )}
       {swatches.length > 0 && (
@@ -301,7 +301,7 @@ export function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="flex-1 rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
+      className="flex-1 rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -323,7 +323,7 @@ export function TextInput({
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 focus:border-brand-400 focus:outline-none"
+      className="w-full rounded-md border border-ink-600 bg-ink-900 px-2 py-1 text-xs text-haze-200 transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
     />
   );
 }
