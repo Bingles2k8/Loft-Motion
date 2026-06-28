@@ -345,12 +345,12 @@ export function Timeline() {
               className="absolute top-0 bottom-0 w-px bg-ink-600"
               style={{ left: timeToX(duration) }}
             />
-            {/* CTI head */}
+            {/* CTI head — rounded Figma-style handle */}
             <div
-              className="pointer-events-none absolute top-0 z-30"
+              className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-brand-500"
               style={{ left: timeToX(time) }}
             >
-              <div className="absolute -left-[6px] top-0 h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-brand-400" />
+              <div className="absolute -left-[6px] top-[5px] h-3 w-3 rounded-[3px] bg-brand-500 shadow-sm" />
             </div>
           </div>
 
@@ -392,9 +392,9 @@ function TransportButton({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-7 w-7 place-items-center rounded transition ${
+      className={`grid h-7 w-7 place-items-center rounded-md transition ${
         active
-          ? "bg-brand-500/20 text-brand-300"
+          ? "bg-brand-500/20 text-brand-500"
           : "text-haze-300 hover:bg-ink-700 hover:text-haze-200"
       }`}
     >
@@ -406,7 +406,7 @@ function TransportButton({
 function PlayheadLine({ x }: { x: number }) {
   return (
     <div
-      className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-brand-400/80"
+      className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-brand-500/70"
       style={{ left: x }}
     />
   );
@@ -722,7 +722,7 @@ function TrackGroup({
   );
   return (
     <div>
-      <ClipBar layer={layer} timeToX={timeToX} duration={duration} xToTime={xToTime} />
+      <ClipBar layer={layer} timeToX={timeToX} duration={duration} xToTime={xToTime} expanded={expanded} />
       {expanded &&
         channels.map((ch) => (
           <KeyframeLane
@@ -743,16 +743,30 @@ function ClipBar({
   timeToX,
   duration,
   xToTime,
+  expanded,
 }: {
   layer: Layer;
   timeToX: (t: number) => number;
   duration: number;
   xToTime: (clientX: number) => number;
+  expanded: boolean;
 }) {
   const updateLayer = useStore((s) => s.updateLayer);
   const beginChange = useStore((s) => s.beginChange);
   const selectLayer = useStore((s) => s.selectLayer);
   const selected = useStore((s) => s.selectedLayerId === layer.id);
+
+  // Label-colour tint (Figma-style coloured track) + a summary of every
+  // keyframe across the layer's channels, shown right on the collapsed bar so
+  // animation activity reads without expanding.
+  const labelColor = layer.label > 0 ? LABEL_COLORS[layer.label] : null;
+  const kfTimes: number[] = [];
+  if (!expanded) {
+    for (const c of layerChannels(layer)) {
+      const ch = getChannel(layer, c.path);
+      if (ch) for (const k of ch.keyframes) kfTimes.push(k.time);
+    }
+  }
 
   const dragBody = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -791,22 +805,43 @@ function ClipBar({
     <div className="relative border-b border-ink-800" style={{ height: ROW_H }}>
       <div
         onPointerDown={dragBody}
-        className={`absolute top-1.5 cursor-grab rounded border active:cursor-grabbing ${
+        className={`absolute top-1.5 cursor-grab overflow-hidden rounded-md border active:cursor-grabbing ${
           selected
-            ? "border-brand-400/60 bg-brand-500/25"
-            : "border-ink-500 bg-ink-650 hover:bg-ink-600"
+            ? "border-brand-400/70 bg-brand-500/25"
+            : labelColor
+              ? "border-transparent hover:brightness-110"
+              : "border-ink-500/70 bg-ink-650 hover:bg-ink-600"
         }`}
-        style={{ left, width, height: ROW_H - 12 }}
+        style={{
+          left,
+          width,
+          height: ROW_H - 12,
+          ...(labelColor && !selected ? { background: labelColor + "26" } : {}),
+        }}
       >
+        {labelColor && (
+          <span
+            className="absolute left-0 top-0 h-full w-1"
+            style={{ background: labelColor }}
+          />
+        )}
         <div
           onPointerDown={dragEdge("start")}
-          className="lm-resize-x absolute left-0 top-0 h-full w-1.5 rounded-l bg-white/15"
+          className="lm-resize-x absolute left-0 top-0 h-full w-1.5 bg-white/15"
         />
         <div
           onPointerDown={dragEdge("end")}
-          className="lm-resize-x absolute right-0 top-0 h-full w-1.5 rounded-r bg-white/15"
+          className="lm-resize-x absolute right-0 top-0 h-full w-1.5 bg-white/15"
         />
       </div>
+      {/* Keyframe summary markers on the collapsed bar. */}
+      {kfTimes.map((t, i) => (
+        <span
+          key={i}
+          className="pointer-events-none absolute top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[1px] bg-brand-400 ring-1 ring-ink-850"
+          style={{ left: timeToX(t) }}
+        />
+      ))}
     </div>
   );
 }
@@ -861,7 +896,7 @@ function KeyframeLane({
     >
       {kfs.length > 1 && (
         <div
-          className="absolute top-1/2 h-px bg-brand-400/25"
+          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-brand-400/15"
           style={{
             left: timeToX(kfs[0].time),
             width: timeToX(kfs[kfs.length - 1].time) - timeToX(kfs[0].time),
