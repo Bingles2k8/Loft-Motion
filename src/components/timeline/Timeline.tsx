@@ -756,17 +756,8 @@ function ClipBar({
   const selectLayer = useStore((s) => s.selectLayer);
   const selected = useStore((s) => s.selectedLayerId === layer.id);
 
-  // Label-colour tint (Figma-style coloured track) + a summary of every
-  // keyframe across the layer's channels, shown right on the collapsed bar so
-  // animation activity reads without expanding.
+  // Label-colour tint (Figma-style coloured track).
   const labelColor = layer.label > 0 ? LABEL_COLORS[layer.label] : null;
-  const kfTimes: number[] = [];
-  if (!expanded) {
-    for (const c of layerChannels(layer)) {
-      const ch = getChannel(layer, c.path);
-      if (ch) for (const k of ch.keyframes) kfTimes.push(k.time);
-    }
-  }
 
   const dragBody = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -834,12 +825,117 @@ function ClipBar({
           className="lm-resize-x absolute right-0 top-0 h-full w-1.5 bg-white/15"
         />
       </div>
-      {/* Keyframe summary markers on the collapsed bar. */}
-      {kfTimes.map((t, i) => (
+      {/* Draggable animation block (Figma Motion-style) — appears on the
+          collapsed track, spanning the layer's keyframes. */}
+      {!expanded && (
+        <AnimationBlock layer={layer} timeToX={timeToX} xToTime={xToTime} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A draggable, resizable block summarising a layer's whole animation — the
+ * Figma Motion interaction, built on the existing keyframe engine. Drag the body
+ * to move the animation in time; drag a handle to retime (stretch/compress) it.
+ * The block carries the keyframe diamonds so activity reads at a glance.
+ */
+function AnimationBlock({
+  layer,
+  timeToX,
+  xToTime,
+}: {
+  layer: Layer;
+  timeToX: (t: number) => number;
+  xToTime: (clientX: number) => number;
+}) {
+  const updateLive = useStore((s) => s.updateLive);
+  const update = useStore((s) => s.update);
+  const beginChange = useStore((s) => s.beginChange);
+  const selectLayer = useStore((s) => s.selectLayer);
+
+  // Snapshot every keyframe time across the layer's channels.
+  const snap: { path: string; id: string; time: number }[] = [];
+  for (const c of layerChannels(layer)) {
+    const ch = getChannel(layer, c.path);
+    if (ch) for (const k of ch.keyframes) snap.push({ path: c.path, id: k.id, time: k.time });
+  }
+  if (snap.length === 0) return null;
+  const t0 = Math.min(...snap.map((a) => a.time));
+  const t1 = Math.max(...snap.map((a) => a.time));
+  const span = t1 - t0;
+
+  // Rewrite each keyframe time from its snapshot via `fn` (live, no history).
+  const retime = (fn: (orig: number) => number, live: boolean) => {
+    (live ? updateLive : update)((s) => {
+      const l = s.layers.find((x) => x.id === layer.id);
+      if (!l) return;
+      for (const c of layerChannels(l)) {
+        const ch = getChannel(l, c.path);
+        if (!ch) continue;
+        for (const k of ch.keyframes) {
+          const o = snap.find((a) => a.path === c.path && a.id === k.id);
+          if (o) k.time = Math.max(0, fn(o.time));
+        }
+        ch.keyframes.sort((a, b) => a.time - b.time);
+      }
+    });
+  };
+
+  const onBody = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    selectLayer(layer.id);
+    beginChange();
+    const startT = xToTime(e.clientX);
+    startDrag((ev) => retime((o) => o + (xToTime(ev.clientX) - startT), true));
+  };
+
+  const onResize = (side: "start" | "end") => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    if (span < 1e-4) return;
+    beginChange();
+    const startT = xToTime(e.clientX);
+    startDrag((ev) => {
+      const dt = xToTime(ev.clientX) - startT;
+      if (side === "start") {
+        const nt0 = Math.min(t1 - 0.05, t0 + dt);
+        const scale = (t1 - nt0) / span;
+        retime((o) => t1 - (t1 - o) * scale, true);
+      } else {
+        const nt1 = Math.max(t0 + 0.05, t1 + dt);
+        const scale = (nt1 - t0) / span;
+        retime((o) => t0 + (o - t0) * scale, true);
+      }
+    });
+  };
+
+  const left = timeToX(t0);
+  const width = Math.max(12, timeToX(t1) - timeToX(t0));
+
+  return (
+    <div
+      onPointerDown={onBody}
+      title="Drag to move the animation · drag a handle to retime"
+      className="absolute top-1.5 z-10 cursor-grab rounded-md border border-brand-500/60 bg-brand-500/15 transition-colors hover:bg-brand-500/25 active:cursor-grabbing"
+      style={{ left, width, height: ROW_H - 12 }}
+    >
+      {span > 1e-4 && (
+        <>
+          <div
+            onPointerDown={onResize("start")}
+            className="lm-resize-x absolute left-0 top-0 h-full w-2 rounded-l-md bg-brand-500/40 hover:bg-brand-500/70"
+          />
+          <div
+            onPointerDown={onResize("end")}
+            className="lm-resize-x absolute right-0 top-0 h-full w-2 rounded-r-md bg-brand-500/40 hover:bg-brand-500/70"
+          />
+        </>
+      )}
+      {snap.map((a, i) => (
         <span
           key={i}
-          className="pointer-events-none absolute top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[1px] bg-brand-400 ring-1 ring-ink-850"
-          style={{ left: timeToX(t) }}
+          className="pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[1px] bg-brand-500 ring-1 ring-white/50"
+          style={{ left: timeToX(a.time) - left }}
         />
       ))}
     </div>
