@@ -568,6 +568,149 @@ function kineticQuote(): SceneDocument {
   ]);
 }
 
+/* ----- Figma Motion-style micro-interactions (clean, light UI) ------------ */
+
+/** 7 — Toggle Switch (Figma-style micro-interaction, 1:1). */
+function figmaToggle(): SceneDocument {
+  const DUR = 3;
+  const cx = 540;
+  const bg = shape("Backdrop", "rect", cx, 540, 1080, 1080, "#eef1f5");
+  const card = shape("Card", "rect", cx, 540, 600, 520, "#ffffff", {
+    r: 44, effects: [shadow()],
+    as: [k(0, 92, "settle"), k(0.4, 100, "settle")],
+    aop: [k(0, 0, "gentle"), k(0.3, 100, "gentle")],
+  });
+  const label = text("Label", "Notifications", cx, 430, 48, 700, "#18181b", {
+    aop: [k(0.15, 0, "gentle"), k(0.45, 100, "gentle")],
+  });
+  const trackGray = shape("Track Off", "rect", cx, 580, 240, 108, "#d1d5db", {
+    r: 54, aop: [k(0.2, 0, "gentle"), k(0.45, 100, "gentle")],
+  });
+  const trackGreen = shape("Track On", "rect", cx, 580, 240, 108, "#22c55e", {
+    r: 54, aop: [k(0.6, 0, "snappy"), k(1.0, 100, "snappy")],
+  });
+  const knob = shape("Knob", "ellipse", cx, 580, 84, 84, "#ffffff", {
+    effects: [shadow()],
+    ax: [k(0.6, cx - 66, "overshoot"), k(1.2, cx + 66, "overshoot")],
+  });
+  const status = text("Status", "On", cx, 700, 32, 700, "#16a34a", {
+    aop: [k(1.0, 0, "gentle"), k(1.4, 100, "gentle")],
+    ay: [k(1.0, 720, "settle"), k(1.4, 700, "settle")],
+  });
+  return doc("Toggle Switch", 1080, 1080, DUR, "#eef1f5", [
+    bg, card, label, trackGray, trackGreen, knob, status,
+  ]);
+}
+
+/** 8 — Button Press (Figma-style micro-interaction, 1:1). */
+function figmaButtonPress(): SceneDocument {
+  const DUR = 3;
+  const cx = 540;
+  const bg = shape("Backdrop", "rect", cx, 540, 1080, 1080, "#eef1f5");
+  const press = [
+    k(0, 100, "gentle"), k(0.7, 100, "gentle"), k(0.85, 93, "sharp"),
+    k(1.0, 93, "gentle"), k(1.25, 100, "overshoot"),
+  ];
+  const button = shape("Button", "rect", cx, 540, 460, 140, "#2563eb", {
+    r: 70, effects: [shadow()], as: press,
+  });
+  const label = text("Label", "Add to cart", cx, 540, 40, 700, "#ffffff", { as: press });
+  const ripple = shape("Ripple", "ellipse", cx, 540, 200, 200, "#eef1f5", {
+    stroke: { color: "#2563eb", width: 8 },
+    as: [k(0.85, 30, "gentle"), k(1.5, 380, "gentle")],
+    aop: [k(0.85, 70, "gentle"), k(1.5, 0, "gentle")],
+  });
+  const done = text("Confirm", "Added to cart ✓", cx, 710, 30, 600, "#16a34a", {
+    aop: [k(1.3, 0, "gentle"), k(1.7, 100, "gentle")],
+    ay: [k(1.3, 730, "settle"), k(1.7, 710, "settle")],
+  });
+  return doc("Button Press", 1080, 1080, DUR, "#eef1f5", [bg, button, label, ripple, done]);
+}
+
+/** 9 — Loading Spinner (Figma's signature trim-path loader, 1:1). */
+function figmaLoader(): SceneDocument {
+  const DUR = 2.4;
+  const cx = 540;
+  const bg = shape("Backdrop", "rect", cx, 540, 1080, 1080, "#f3f4f6");
+  const card = shape("Card", "rect", cx, 540, 520, 520, "#ffffff", { r: 40, effects: [shadow()] });
+  const ring = shape("Spinner", "ellipse", cx, 540, 240, 240, "#ffffff", {
+    stroke: { color: "#6366f1", width: 18, cap: "round" },
+    trimEnd: [k(0, 8, "gentle"), k(1.2, 78, "gentle"), k(2.4, 8, "gentle")],
+    behaviors: [spin(220)],
+  });
+  const label = text("Label", "Loading…", cx, 770, 30, 600, "#6b7280");
+  return doc("Loading Spinner", 1080, 1080, DUR, "#f3f4f6", [bg, card, ring, label]);
+}
+
+/** 10 — Notification Toast (Figma-style, 16:9; slide up, hold, slide out). */
+function figmaToast(): SceneDocument {
+  const DUR = 4;
+  const bg = shape("Backdrop", "rect", 960, 540, 1920, 1080, "#eaecef");
+  // Shared slide-in/out for the toast and everything riding on it.
+  const slide = (ry: number): Keyframe[] => [
+    k(0.3, ry + 360, "settle"), k(1.0, ry, "settle"),
+    k(2.8, ry, "gentle"), k(3.5, ry + 360, "easeIn"),
+  ];
+  const fade: Keyframe[] = [
+    k(0.3, 0, "gentle"), k(0.7, 100, "gentle"), k(3.0, 100, "gentle"), k(3.5, 0, "gentle"),
+  ];
+  const toast = shape("Toast", "rect", 960, 820, 760, 150, "#ffffff", {
+    r: 28, effects: [shadow()], ay: slide(820), aop: fade,
+  });
+  const check = shape("Check", "ellipse", 680, 820, 84, 84, "#16a34a", {
+    ay: slide(820),
+    as: [k(1.0, 0, "overshoot"), k(1.5, 100, "overshoot")],
+    aop: [k(1.0, 0, "gentle"), k(1.3, 100, "gentle"), k(3.0, 100, "gentle"), k(3.4, 0, "gentle")],
+  });
+  const tick = text("Tick", "✓", 680, 812, 46, 800, "#ffffff", {
+    ay: slide(812),
+    aop: [k(1.2, 0, "gentle"), k(1.5, 100, "gentle"), k(3.0, 100, "gentle"), k(3.4, 0, "gentle")],
+  });
+  const title = text("Title", "Payment successful", 1015, 793, 38, 700, "#18181b", {
+    ay: slide(793), aop: fade,
+  });
+  const subtitle = text("Subtitle", "Your order is confirmed.", 1015, 848, 26, 400, "#6b7280", {
+    ay: slide(848), aop: fade,
+  });
+  return doc("Notification Toast", 1920, 1080, DUR, "#eaecef", [
+    bg, toast, check, tick, title, subtitle,
+  ]);
+}
+
+/** 11 — Card Hover Lift (Figma-style, 16:9; lift on hover, hold, settle). */
+function figmaCardHover(): SceneDocument {
+  const DUR = 4;
+  const bg = shape("Backdrop", "rect", 960, 540, 1920, 1080, "#e9ebef");
+  // Uniform lift (translateY) so the whole card moves together without parenting.
+  const lift = (ry: number): Keyframe[] => [
+    k(0.8, ry, "settle"), k(1.4, ry - 48, "settle"),
+    k(2.8, ry - 48, "gentle"), k(3.4, ry, "settle"),
+  ];
+  const fin: Keyframe[] = [k(0, 0, "gentle"), k(0.4, 100, "gentle")];
+  const card = shape("Card", "rect", 960, 560, 520, 680, "#ffffff", {
+    r: 28, effects: [shadow()], ay: lift(560), aop: fin,
+  });
+  const header = shape("Header", "rect", 960, 360, 476, 220, "#6366f1", {
+    r: 18, gradientTo: "#a855f7", gradientAngle: 120, ay: lift(360), aop: fin,
+  });
+  const title = text("Title", "Aurora Headphones", 960, 540, 34, 700, "#18181b", {
+    ay: lift(540), aop: fin,
+  });
+  const price = text("Price", "$249", 960, 600, 30, 700, "#6366f1", { ay: lift(600), aop: fin });
+  const meta = text("Meta", "Wireless · 40h battery", 960, 650, 24, 400, "#9ca3af", {
+    ay: lift(650), aop: fin,
+  });
+  const button = shape("Button", "rect", 960, 790, 360, 76, "#2563eb", {
+    r: 38, ay: lift(790), aop: fin,
+  });
+  const buttonLabel = text("Button Label", "Add to cart", 960, 790, 28, 700, "#ffffff", {
+    ay: lift(790), aop: fin,
+  });
+  return doc("Card Hover", 1920, 1080, DUR, "#e9ebef", [
+    bg, card, header, title, price, meta, button, buttonLabel,
+  ]);
+}
+
 /* ------------------------------ registry --------------------------------- */
 
 interface TemplateDef {
@@ -620,6 +763,41 @@ const TEMPLATES: TemplateDef[] = [
     blurb: "Bold three-line typography revealed word by word over a drifting glow.",
     tools: ["Kinetic text", "Bloom", "Wiggle"],
     build: kineticQuote,
+  },
+  {
+    id: "tpl-toggle",
+    name: "Toggle Switch",
+    blurb: "A clean UI toggle that springs on — knob slides with overshoot as the track turns green.",
+    tools: ["Micro-interaction", "Spring", "Light UI"],
+    build: figmaToggle,
+  },
+  {
+    id: "tpl-button-press",
+    name: "Button Press",
+    blurb: "A button that presses in and springs back with a ripple and a confirmation.",
+    tools: ["Micro-interaction", "Ripple", "Overshoot"],
+    build: figmaButtonPress,
+  },
+  {
+    id: "tpl-loader",
+    name: "Loading Spinner",
+    blurb: "Figma's signature loader — a trim-path arc that grows and shrinks while it spins.",
+    tools: ["Trim paths", "Spin", "Loop"],
+    build: figmaLoader,
+  },
+  {
+    id: "tpl-toast",
+    name: "Notification Toast",
+    blurb: "A success toast that slides up, pops a check, holds, then slides away.",
+    tools: ["Slide in/out", "Spring", "Light UI"],
+    build: figmaToast,
+  },
+  {
+    id: "tpl-card-hover",
+    name: "Card Hover",
+    blurb: "A product card that lifts on hover and settles back — soft, deliberate motion.",
+    tools: ["Hover lift", "Ease-out", "Light UI"],
+    build: figmaCardHover,
   },
 ];
 

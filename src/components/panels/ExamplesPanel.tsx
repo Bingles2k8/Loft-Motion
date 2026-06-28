@@ -141,6 +141,11 @@ function TemplatePreview({ id }: { id: string }) {
     "tpl-logo-sting": "from-[#0a0800] to-[#5a3d0a]",
     "tpl-lower-third": "from-[#0b0d14] to-[#241016]",
     "tpl-kinetic-quote": "from-[#160d12] to-[#5a2236]",
+    "tpl-toggle": "from-[#eef1f5] to-[#d6dce5]",
+    "tpl-button-press": "from-[#eef1f5] to-[#d6dce5]",
+    "tpl-loader": "from-[#f3f4f6] to-[#e0e4ea]",
+    "tpl-toast": "from-[#eaecef] to-[#d3d8df]",
+    "tpl-card-hover": "from-[#e9ebef] to-[#d2d7df]",
   };
   return (
     <div className={`relative grid h-32 place-items-center overflow-hidden bg-gradient-to-br ${grad[id] ?? "from-ink-900 to-ink-800"}`}>
@@ -173,6 +178,30 @@ function TemplatePreview({ id }: { id: string }) {
           <span className="h-2.5 w-28 rounded-full bg-white/70" />
           <span className="h-2.5 w-32 rounded-full bg-white/70" />
           <span className="lm-ex-pulse h-2.5 w-24 rounded-full bg-[#fb7185]" />
+        </div>
+      ) : id === "tpl-toggle" ? (
+        <span className="relative inline-block h-7 w-14 rounded-full bg-[#22c55e]">
+          <span className="lm-ex-pulse absolute right-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow" />
+        </span>
+      ) : id === "tpl-button-press" ? (
+        <div className="lm-ex-pulse rounded-xl bg-[#2563eb] px-5 py-2.5 text-[10px] font-bold text-white shadow">
+          Add to cart
+        </div>
+      ) : id === "tpl-loader" ? (
+        <div className="lm-spin h-9 w-9 rounded-full border-[3px] border-[#6366f1] border-t-transparent" />
+      ) : id === "tpl-toast" ? (
+        <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 shadow">
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-[#16a34a] text-[9px] font-bold text-white">✓</span>
+          <div className="flex flex-col gap-1">
+            <span className="h-1.5 w-16 rounded-full bg-[#52525b]/70" />
+            <span className="h-1.5 w-10 rounded-full bg-[#a1a1aa]/70" />
+          </div>
+        </div>
+      ) : id === "tpl-card-hover" ? (
+        <div className="lm-ex-pulse w-16 overflow-hidden rounded-lg bg-white shadow">
+          <span className="block h-6 w-full bg-gradient-to-br from-[#6366f1] to-[#a855f7]" />
+          <span className="mx-1.5 mt-1.5 block h-1.5 w-9 rounded-full bg-[#52525b]/60" />
+          <span className="mx-1.5 mb-1.5 mt-1 block h-1.5 w-6 rounded-full bg-[#a1a1aa]/60" />
         </div>
       ) : (
         // Aurora promo (default)
