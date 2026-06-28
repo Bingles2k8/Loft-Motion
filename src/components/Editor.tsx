@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useStore } from "@/lib/store/useStore";
 import { Toolbar } from "@/components/Toolbar";
+import { BottomToolbar } from "@/components/BottomToolbar";
 import { Stage } from "@/components/Stage";
 import { Timeline } from "@/components/timeline/Timeline";
 import { LeftDock } from "@/components/panels/LeftDock";
@@ -20,6 +21,16 @@ export function Editor() {
   const playing = useStore((s) => s.playing);
   const sizes = useStore((s) => s.sizes);
   const setPanelSize = useStore((s) => s.setPanelSize);
+  const theme = useStore((s) => s.theme);
+  const mode = useStore((s) => s.mode);
+
+  // Reflect the active theme onto <html> so the CSS variable overrides apply.
+  // Light is the default (matches SSR), so only dark touches the attribute.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.dataset.theme = "dark";
+    else delete root.dataset.theme;
+  }, [theme]);
 
   // Playback loop — advances the playhead off the store directly so it doesn't
   // thrash React. The renderer reacts to `time` via Stage.
@@ -116,6 +127,9 @@ export function Editor() {
         }
       } else if (key === "g" && e.shiftKey) {
         s.toggleGraphMode();
+      } else if (key === "e" && e.shiftKey) {
+        e.preventDefault();
+        s.toggleMode();
       } else if (key === "?" || (key === "/" && e.shiftKey)) {
         e.preventDefault();
         s.setShowShortcuts(true);
@@ -136,8 +150,9 @@ export function Editor() {
     <div className="flex h-screen flex-col overflow-hidden bg-ink-950 text-haze-200">
       <Toolbar />
 
-      {/* Upper region: left dock | stage | properties */}
-      <div className="flex min-h-0 flex-1">
+      {/* Upper region: left dock | stage | properties (relative anchor for the
+          floating bottom toolbar). */}
+      <div className="relative flex min-h-0 flex-1">
         <div className="shrink-0" style={{ width: sizes.left }}>
           <LeftDock />
         </div>
@@ -162,20 +177,27 @@ export function Editor() {
         <div className="shrink-0" style={{ width: sizes.right }}>
           <PropertiesPanel />
         </div>
+
+        {/* Floating, bottom-centre toolbar (UI3). */}
+        <BottomToolbar />
       </div>
 
-      {/* Timeline divider + timeline */}
-      <Splitter
-        orientation="horizontal"
-        invert
-        value={sizes.bottom}
-        min={160}
-        max={640}
-        onChange={(v) => setPanelSize("bottom", v)}
-      />
-      <div className="shrink-0" style={{ height: sizes.bottom }}>
-        <Timeline />
-      </div>
+      {/* Timeline — revealed only in Motion mode. */}
+      {mode === "motion" && (
+        <>
+          <Splitter
+            orientation="horizontal"
+            invert
+            value={sizes.bottom}
+            min={160}
+            max={640}
+            onChange={(v) => setPanelSize("bottom", v)}
+          />
+          <div className="shrink-0" style={{ height: sizes.bottom }}>
+            <Timeline />
+          </div>
+        </>
+      )}
 
       <ExportPanel />
       <PrinciplesPanel />
