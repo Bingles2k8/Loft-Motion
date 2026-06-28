@@ -51,17 +51,56 @@ import { IconChevron, IconKey, IconPlus, IconTrash } from "@/components/ui/icons
 
 type TextAlign = (typeof TEXT_ALIGN)[number];
 
+type PanelTab = "design" | "motion";
+
 export function PropertiesPanel() {
   const selectedLayerId = useStore((s) => s.selectedLayerId);
   const selectedKeys = useStore((s) => s.selectedKeys);
   const scene = useStore((s) => s.scene);
   const layer = scene.layers.find((l) => l.id === selectedLayerId) ?? null;
+  const [tab, setTab] = useState<PanelTab>("design");
 
   return (
-    <aside className="flex h-full flex-col overflow-y-auto border-l border-ink-700 bg-ink-850">
-      {selectedKeys.length > 0 && <KeyframeEditor />}
-      {layer ? <LayerProperties layer={layer} /> : <CompositionProperties />}
+    <aside className="flex h-full flex-col border-l border-ink-700 bg-ink-850">
+      {/* Design / Motion tabs — mirrors Figma's right-sidebar split. */}
+      <div className="flex shrink-0 border-b border-ink-700 px-2 pt-1.5">
+        {(["design", "motion"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`relative px-3 py-1.5 text-xs font-semibold capitalize transition ${
+              tab === t ? "text-haze-200" : "text-haze-500 hover:text-haze-300"
+            }`}
+          >
+            {t}
+            {tab === t && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-500" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {selectedKeys.length > 0 && <KeyframeEditor />}
+        {layer ? (
+          <LayerProperties layer={layer} tab={tab} />
+        ) : tab === "design" ? (
+          <CompositionProperties />
+        ) : (
+          <MotionEmptyState />
+        )}
+      </div>
     </aside>
+  );
+}
+
+function MotionEmptyState() {
+  return (
+    <div className="px-3 py-4 text-[11px] leading-relaxed text-haze-500">
+      Select a layer to animate it. The Motion tab gathers Auto-Animate,
+      Behaviors and per-format export compatibility. Switch to Motion mode
+      (<kbd className="rounded bg-ink-700 px-1">⇧E</kbd>) for the timeline.
+    </div>
   );
 }
 
@@ -285,7 +324,7 @@ function ChannelField({ layer, channel }: { layer: Layer; channel: ChannelDef })
 
 /* -------------------------------------------------------------------------- */
 
-function LayerProperties({ layer }: { layer: Layer }) {
+function LayerProperties({ layer, tab }: { layer: Layer; tab: PanelTab }) {
   const updateLayer = useStore((s) => s.updateLayer);
   const removeLayer = useStore((s) => s.removeLayer);
   const duplicateLayer = useStore((s) => s.duplicateLayer);
@@ -294,6 +333,18 @@ function LayerProperties({ layer }: { layer: Layer }) {
   const set = (patch: (l: Layer) => void) => updateLayer(layer.id, patch);
   const shape = layer.shape;
   const text = layer.text;
+
+  // The Motion tab focuses on animation: Auto-Animate, Behaviors and the
+  // honest per-format export report. Everything structural lives in Design.
+  if (tab === "motion") {
+    return (
+      <>
+        <AutoAnimateSection layer={layer} />
+        <BehaviorsSection layer={layer} />
+        <CapabilitySection layer={layer} scene={scene} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -378,7 +429,6 @@ function LayerProperties({ layer }: { layer: Layer }) {
       </Section>
 
       <AlignSection layer={layer} />
-      <AutoAnimateSection layer={layer} />
 
       <Section title="Transform" collapsible>
         {TRANSFORM_CHANNELS.map((c) => (
@@ -508,10 +558,8 @@ function LayerProperties({ layer }: { layer: Layer }) {
 
       {layer.type === "text" && text && <TextSection layer={layer} />}
 
-      <BehaviorsSection layer={layer} />
       <ClonerSection layer={layer} />
       <EffectsSection layer={layer} />
-      <CapabilitySection layer={layer} scene={scene} />
     </>
   );
 }

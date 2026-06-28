@@ -59,12 +59,32 @@ function cloner(over: Partial<Cloner>): Cloner {
   return { ...createCloner(), ...over };
 }
 
+/** Browsable template categories (Figma-style gallery filtering). */
+export type ExampleCategory =
+  | "Loading"
+  | "Logo & Brand"
+  | "Text"
+  | "Micro-interactions"
+  | "Reveals"
+  | "Backgrounds";
+
+export const EXAMPLE_CATEGORIES: ExampleCategory[] = [
+  "Loading",
+  "Logo & Brand",
+  "Text",
+  "Micro-interactions",
+  "Reveals",
+  "Backgrounds",
+];
+
 export interface ExampleProject {
   id: string;
   name: string;
   blurb: string;
   /** Tools used, for the gallery card. */
   tools: string[];
+  /** Gallery category, for filtering. */
+  category: ExampleCategory;
   build: () => SceneDocument;
 }
 
@@ -81,7 +101,7 @@ function doc(name: string, layers: Layer[], bg = "#0e0e12", duration = 5): Scene
 
 /* -------------------------------------------------------------------------- */
 
-const EXAMPLES: ExampleProject[] = [
+const EXAMPLES: Omit<ExampleProject, "category">[] = [
   {
     id: "floating-particles",
     name: "Floating Particles",
@@ -395,4 +415,29 @@ const EXAMPLES: ExampleProject[] = [
   },
 ];
 
-export const EXAMPLE_PROJECTS = EXAMPLES;
+/** Gallery category per example id. */
+const CATEGORY_BY_ID: Record<string, ExampleCategory> = {
+  "floating-particles": "Backgrounds",
+  "pulsing-logo": "Logo & Brand",
+  "loading-spinner": "Loading",
+  "audio-bars": "Loading",
+  "confetti-burst": "Micro-interactions",
+  "orbiting-dots": "Backgrounds",
+  "wave-text": "Backgrounds",
+  "wobble-blob": "Backgrounds",
+  "bouncy-pop": "Micro-interactions",
+  "staggered-grid": "Reveals",
+  "radial-pulse": "Loading",
+  "jelly-drift": "Backgrounds",
+  "neon-orbit": "Backgrounds",
+  "draw-on": "Reveals",
+  "kinetic-headline": "Text",
+  "stat-counter": "Text",
+  "toggle-micro": "Micro-interactions",
+  "logo-reveal": "Logo & Brand",
+};
+
+export const EXAMPLE_PROJECTS: ExampleProject[] = EXAMPLES.map((e) => ({
+  ...e,
+  category: CATEGORY_BY_ID[e.id] ?? "Backgrounds",
+}));

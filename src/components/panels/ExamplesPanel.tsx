@@ -1,19 +1,37 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store/useStore";
-import { EXAMPLE_PROJECTS } from "@/lib/scene/examples";
+import {
+  EXAMPLE_CATEGORIES,
+  EXAMPLE_PROJECTS,
+  type ExampleCategory,
+} from "@/lib/scene/examples";
+
+type Filter = "All" | ExampleCategory;
 
 /**
- * Examples launcher — a gallery of ready-made procedural projects. Clicking one
- * loads it as the current scene (replacing the project). Great for learning the
- * procedural tools by example.
+ * Template gallery — a browsable, categorised set of ready-made projects, in the
+ * spirit of Figma Community templates. Filter by category; click to load one as
+ * the current scene (replacing the project).
  */
 export function ExamplesPanel() {
   const show = useStore((s) => s.showExamples);
   const setShow = useStore((s) => s.setShowExamples);
   const loadScene = useStore((s) => s.loadScene);
+  const [filter, setFilter] = useState<Filter>("All");
+
+  const visible = useMemo(
+    () =>
+      filter === "All"
+        ? EXAMPLE_PROJECTS
+        : EXAMPLE_PROJECTS.filter((e) => e.category === filter),
+    [filter],
+  );
 
   if (!show) return null;
+
+  const filters: Filter[] = ["All", ...EXAMPLE_CATEGORIES];
 
   return (
     <div
@@ -26,9 +44,9 @@ export function ExamplesPanel() {
       >
         <div className="flex items-center justify-between border-b border-ink-700 px-5 py-3.5">
           <div>
-            <h2 className="text-sm font-bold text-haze-200">Example Projects</h2>
+            <h2 className="text-sm font-bold text-haze-200">Template Gallery</h2>
             <p className="text-[11px] text-haze-500">
-              Procedural animations built with behaviors + the cloner. Click to load.
+              Ready-made motion templates. Filter by category and click to load.
             </p>
           </div>
           <button
@@ -39,8 +57,25 @@ export function ExamplesPanel() {
           </button>
         </div>
 
+        {/* Category filter chips */}
+        <div className="flex flex-wrap gap-1.5 border-b border-ink-700 px-5 py-2.5">
+          {filters.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                filter === f
+                  ? "bg-brand-500 text-white"
+                  : "bg-ink-800 text-haze-400 hover:bg-ink-700 hover:text-haze-200"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
         <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-5 sm:grid-cols-3">
-          {EXAMPLE_PROJECTS.map((ex) => (
+          {visible.map((ex) => (
             <button
               key={ex.id}
               onClick={() => {
